@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -61,7 +61,30 @@ function shiftDate(date: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export default function HomePage() {
+function HomePageSkeleton() {
+  return (
+    <div className="px-6 py-10 lg:px-10">
+      <div className="animate-pulse">
+        <div className="h-12 w-2/3 bg-[var(--panel)] rounded mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 bg-[var(--panel)] rounded-md" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function HomePageWrapper() {
+  return (
+    <Suspense fallback={<HomePageSkeleton />}>
+      <HomePage />
+    </Suspense>
+  );
+}
+
+export function HomePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialDate = searchParams.get("date") ?? todayStr();
