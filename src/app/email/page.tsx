@@ -148,13 +148,17 @@ export default function EmailPage() {
           <div className="text-sm text-amber-200/90">
             <div className="font-medium text-amber-200">SMTP 凭据未配置</div>
             <div className="text-xs mt-1 text-amber-300/70">
-              请确认环境变量 <code className="font-mono">SMTP_HOST</code> /{" "}
+              请在下方「SMTP 凭据」中填写主机、端口、账号、授权码后保存；或确认环境变量{" "}
+              <code className="font-mono">SMTP_HOST</code> /{" "}
               <code className="font-mono">SMTP_USER</code> /{" "}
               <code className="font-mono">SMTP_PASS</code> 已设置。配置后即可发送邮件。
             </div>
           </div>
         </div>
       )}
+
+      {/* SMTP Credentials */}
+      <SmtpCard draft={draft} setDraft={setDraft} configured={emailConfigured} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
@@ -506,6 +510,134 @@ export default function EmailPage() {
           {toast.msg}
         </div>
       )}
+    </div>
+  );
+}
+
+function SmtpCard({
+  draft,
+  setDraft,
+  configured,
+}: {
+  draft: Partial<EmailSettings>;
+  setDraft: React.Dispatch<React.SetStateAction<Partial<EmailSettings>>>;
+  configured: boolean;
+}) {
+  const [showPass, setShowPass] = useState(false);
+  return (
+    <div className="mb-5 rounded-lg border border-slate-800 bg-[#0d1322] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+          <Settings2 className="w-3 h-3" />
+          SMTP 凭据
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase">
+          {configured ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              已配置
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              未配置
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            SMTP 主机 / Host
+          </label>
+          <input
+            value={draft.smtp_host ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_host: e.target.value }))}
+            placeholder="smtp.example.com"
+            className="w-full px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            端口 / Port
+          </label>
+          <input
+            type="number"
+            value={draft.smtp_port ?? 465}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_port: Number(e.target.value) || 465 }))}
+            placeholder="465"
+            className="w-full px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            账号 / Username
+          </label>
+          <input
+            value={draft.smtp_user ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_user: e.target.value }))}
+            placeholder="alerts@example.com"
+            className="w-full px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            授权码 / Password
+          </label>
+          <div className="flex gap-1.5">
+            <input
+              type={showPass ? "text" : "password"}
+              value={draft.smtp_pass ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, smtp_pass: e.target.value }))}
+              placeholder="SMTP 授权码"
+              className="flex-1 px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass((s) => !s)}
+              className="px-2 py-1.5 text-xs rounded border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            >
+              {showPass ? "隐藏" : "显示"}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            发件人名称
+          </label>
+          <input
+            value={draft.smtp_from_name ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_from_name: e.target.value }))}
+            placeholder="全球要闻简报"
+            className="w-full px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+            发件人邮箱（可选，默认用账号）
+          </label>
+          <input
+            value={draft.smtp_from_email ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_from_email: e.target.value }))}
+            placeholder="noreply@example.com"
+            className="w-full px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
+          />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2 text-sm text-slate-400">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={draft.smtp_secure ?? true}
+            onChange={(e) => setDraft((d) => ({ ...d, smtp_secure: e.target.checked }))}
+            className="rounded border-slate-600"
+          />
+          使用 SSL/TLS（端口 465 时建议勾选，587/STARTTLS 时按需）
+        </label>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        填写完成后点击下方「保存设置」即可生效。系统优先使用此处保存的凭据；若未保存，则尝试从平台集成或环境变量读取。
+      </p>
     </div>
   );
 }

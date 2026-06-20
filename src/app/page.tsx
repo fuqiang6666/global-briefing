@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Sparkles,
-  RefreshCw,
   Mail,
   ChevronDown,
   ChevronUp,
@@ -319,20 +318,6 @@ export function HomePage() {
                   <Mail className="w-3.5 h-3.5" />
                 )}
                 发送邮件
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating}
-                className="px-3 py-1.5 text-sm rounded-md bg-amber-500 text-slate-900 hover:bg-amber-400 disabled:opacity-50 font-medium flex items-center gap-1.5"
-              >
-                {generating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3.5 h-3.5" />
-                )}
-                {generating ? "生成中…" : "AI 重新生成"}
               </button>
             </div>
           </div>

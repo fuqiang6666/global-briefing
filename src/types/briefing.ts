@@ -122,6 +122,13 @@ export interface EmailSettings {
   include_model_link: boolean;
   last_sent_at: string | null;
   note: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_user: string | null;
+  smtp_pass: string | null;
+  smtp_secure: boolean | null;
+  smtp_from_name: string | null;
+  smtp_from_email: string | null;
   created_at: string;
   updated_at: string;
 }

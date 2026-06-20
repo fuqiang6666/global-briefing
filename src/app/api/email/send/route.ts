@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const date = body.date ?? (await todayDateString());
     const isTest = body.test === true;
 
-    if (!isEmailConfigured()) {
+    if (!(await isEmailConfigured())) {
       return NextResponse.json(
         { success: false, error: "SMTP 凭据未配置" },
         { status: 500 },
