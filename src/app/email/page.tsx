@@ -17,6 +17,20 @@ import {
 } from "lucide-react";
 import type { EmailSettings, EmailSendLog } from "@/types/briefing";
 import { isEmailConfigured } from "@/lib/email-client";
+ 
+// 安全的 JSON 解析：避免服务器返回 HTML 错误页时崩溃
+async function safeJson<T = unknown>(res: Response): Promise<T> {
+  const ct = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (!ct.includes("application/json")) {
+    throw new Error(`接口返回非 JSON（HTTP ${res.status}）：${text.slice(0, 120)}`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    throw new Error(`JSON 解析失败：${text.slice(0, 120)}`);
+  }
+}
 
 export default function EmailPage() {
   const [settings, setSettings] = useState<EmailSettings | null>(null);
@@ -29,18 +43,23 @@ export default function EmailPage() {
   const [newCc, setNewCc] = useState("");
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [hasSmtpPass, setHasSmtpPass] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [s, l, c] = await Promise.all([
-        fetch("/api/email/settings").then((r) => r.json()),
-        fetch("/api/email/logs?limit=10").then((r) => r.json()),
-        fetch("/api/email/status").then((r) => r.json()),
+        fetch("/api/email/settings").then(safeJson<{ success: boolean; item?: EmailSettings }>),
+        fetch("/api/email/logs?limit=10").then(safeJson<{ success: boolean; items: EmailSendLog[] }>),
+        fetch("/api/email/status").then(safeJson<{ success: boolean; configured: boolean }>),
       ]);
-      if (s.success) {
+      if (s.success && s.item) {
+        // 出于安全考虑：不在前端暴露已保存的密码。
+        // 保留 hasSmtpPass 标志，让用户知晓已配置。
         setSettings(s.item);
-        setDraft(s.item ?? {});
+        const { smtp_pass: _ignored, ...rest } = s.item as EmailSettings & { smtp_pass?: string };
+        setDraft({ ...rest, smtp_pass: "" });
+        setHasSmtpPass(Boolean(s.item.smtp_pass));
       }
       if (l.success) setLogs(l.items);
       if (c.success) setEmailConfigured(c.configured);
@@ -64,18 +83,23 @@ export default function EmailPage() {
   async function handleSave() {
     setSaving(true);
     try {
+      // 如果用户没有改密码，就不要覆盖 DB 里的密码
+      const payload: Record<string, unknown> = { ...draft };
+      if (!payload.smtp_pass || (payload.smtp_pass as string).trim() === "") {
+        delete payload.smtp_pass;
+      }
       const res = await fetch("/api/email/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await safeJson<{ success: boolean; item?: EmailSettings; error?: string }>(res);
       if (json.success) {
-        setSettings(json.item);
+        setSettings(json.item ?? null);
         setToast({ type: "ok", msg: "已保存" });
         await load();
       } else {
-        setToast({ type: "err", msg: json.error });
+        setToast({ type: "err", msg: json.error ?? "保存失败" });
       }
     } catch (e: unknown) {
       setToast({ type: "err", msg: e instanceof Error ? e.message : String(e) });
@@ -158,7 +182,7 @@ export default function EmailPage() {
       )}
 
       {/* SMTP Credentials */}
-      <SmtpCard draft={draft} setDraft={setDraft} configured={emailConfigured} />
+      <SmtpCard draft={draft} setDraft={setDraft} configured={emailConfigured} hasSmtpPass={hasSmtpPass} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
@@ -518,10 +542,12 @@ function SmtpCard({
   draft,
   setDraft,
   configured,
+  hasSmtpPass,
 }: {
   draft: Partial<EmailSettings>;
   setDraft: React.Dispatch<React.SetStateAction<Partial<EmailSettings>>>;
   configured: boolean;
+  hasSmtpPass: boolean;
 }) {
   const [showPass, setShowPass] = useState(false);
   return (
@@ -589,7 +615,7 @@ function SmtpCard({
               type={showPass ? "text" : "password"}
               value={draft.smtp_pass ?? ""}
               onChange={(e) => setDraft((d) => ({ ...d, smtp_pass: e.target.value }))}
-              placeholder="SMTP 授权码"
+              placeholder={hasSmtpPass ? "已保存（如需修改请输入新值）" : "SMTP 授权码"}
               className="flex-1 px-2 py-1.5 text-sm rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono"
             />
             <button
