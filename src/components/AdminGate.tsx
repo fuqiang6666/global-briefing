@@ -113,9 +113,6 @@ export default function AdminGate({ children, title = "管理后台", subtitle =
               进入后台
             </button>
           </form>
-          <p className="mt-4 text-[10px] text-slate-600">
-            提示：密码默认值为 <code className="text-amber-500/80">fu57124</code>，可通过环境变量 <code className="text-amber-500/80">ADMIN_PASSWORD</code> 覆盖。
-          </p>
         </div>
       </div>
     );
