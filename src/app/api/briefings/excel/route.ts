@@ -1,15 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listBriefingsByDate, bulkUpsertBriefings } from "@/storage/database/briefings";
+import {
+  listBriefingsByDate,
+  listBriefingsByFilter,
+  bulkUpsertBriefings,
+  type BriefingFilter,
+} from "@/storage/database/briefings";
 import { jsonToXlsxBuffer, xlsxBufferToJson } from "@/lib/excel";
+import type { Briefing, BriefingSection, ConfidenceLevel } from "@/types/briefing";
 
 export const dynamic = "force-dynamic";
+
+const VALID_SECTIONS: BriefingSection[] = ["long_term", "domestic_impact", "weekly_event"];
+const VALID_CONFIDENCES: ConfidenceLevel[] = ["high", "medium", "low"];
+
+function parseFilter(searchParams: URLSearchParams): BriefingFilter | null {
+  const dateFrom = searchParams.get("date_from");
+  const dateTo = searchParams.get("date_to");
+  const date = searchParams.get("date");
+  const sectionsParam = searchParams.get("sections");
+  const confidencesParam = searchParams.get("confidences");
+  const keyword = searchParams.get("q");
+  if (!date && !dateFrom && !dateTo && !sectionsParam && !confidencesParam && !keyword) {
+    return null;
+  }
+  const sections = sectionsParam
+    ? sectionsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is BriefingSection => VALID_SECTIONS.includes(s as BriefingSection))
+    : undefined;
+  const confidences = confidencesParam
+    ? confidencesParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(
+          (s): s is ConfidenceLevel => VALID_CONFIDENCES.includes(s as ConfidenceLevel),
+        )
+    : undefined;
+  return {
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    sections: sections && sections.length > 0 ? sections : undefined,
+    confidences: confidences && confidences.length > 0 ? confidences : undefined,
+    keyword: keyword || undefined,
+    limit: 5000,
+    offset: 0,
+  };
+}
+
+function buildFilename(filter: BriefingFilter | null, singleDate: string | null): string {
+  if (singleDate) return `briefings_${singleDate}.xlsx`;
+  if (!filter) return "briefings_template.xlsx";
+  const parts: string[] = ["briefings"];
+  if (filter.dateFrom) parts.push(`from_${filter.dateFrom}`);
+  if (filter.dateTo) parts.push(`to_${filter.dateTo}`);
+  if (filter.sections && filter.sections.length > 0) parts.push(`sec_${filter.sections.join("-")}`);
+  if (filter.confidences && filter.confidences.length > 0)
+    parts.push(`conf_${filter.confidences.join("-")}`);
+  if (filter.keyword) {
+    const kw = filter.keyword
+      .replace(/[^\w\u4e00-\u9fa5]/g, "_")
+      .slice(0, 30);
+    const kwAscii = Buffer.from(kw, "utf8").toString("ascii").replace(/[^\x20-\x7E]/g, "_");
+    if (kwAscii) parts.push(`kw_${kwAscii}`);
+  }
+  return `${parts.join("_")}.xlsx`;
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
-    const all = !date;
-    const items = date ? await listBriefingsByDate(date) : [];
+    const filter = parseFilter(searchParams);
+    let items: Briefing[];
+    if (date) {
+      items = await listBriefingsByDate(date);
+    } else if (filter) {
+      const result = await listBriefingsByFilter(filter);
+      items = result.items;
+    } else {
+      items = [];
+    }
     const rows = items.map((b) => ({
       id: b.id,
       briefing_date: b.briefing_date,
@@ -41,15 +112,13 @@ export async function GET(request: NextRequest) {
               confidence: "high",
               detailed_analysis: "## 详细分析\n...",
               related_symbols: "[]",
-              volatility_forecast: "±0.5%~±1%",
+              volatility_forecast: "+0.5%~+1%",
               event_date: "",
             },
           ],
       "briefings",
     );
-    const filename = all
-      ? "briefings_template.xlsx"
-      : `briefings_${date}.xlsx`;
+    const filename = buildFilename(filter, date);
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type":

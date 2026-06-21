@@ -13,6 +13,55 @@ export async function listBriefingsByDate(date: string): Promise<Briefing[]> {
   return (data ?? []) as Briefing[];
 }
 
+export interface BriefingFilter {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  sections?: BriefingSection[] | null;
+  confidences?: ConfidenceLevel[] | null;
+  keyword?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export interface BriefingFilterResult {
+  items: Briefing[];
+  total: number;
+}
+
+export async function listBriefingsByFilter(
+  filter: BriefingFilter,
+): Promise<BriefingFilterResult> {
+  const supabase = getSupabaseClient();
+  let q = supabase
+    .from("briefings")
+    .select("*", { count: "exact" });
+  if (filter.dateFrom) q = q.gte("briefing_date", filter.dateFrom);
+  if (filter.dateTo) q = q.lte("briefing_date", filter.dateTo);
+  if (filter.sections && filter.sections.length > 0) q = q.in("section", filter.sections);
+  if (filter.confidences && filter.confidences.length > 0)
+    q = q.in("confidence", filter.confidences);
+  if (filter.keyword && filter.keyword.trim()) {
+    const kw = `%${filter.keyword.trim()}%`;
+    q = q.or(
+      `title.ilike.${kw},body.ilike.${kw},source.ilike.${kw},detailed_analysis.ilike.${kw}`,
+    );
+  }
+  q = q
+    .order("briefing_date", { ascending: false })
+    .order("section", { ascending: true })
+    .order("sort_order", { ascending: true });
+  if (typeof filter.limit === "number") {
+    const off = typeof filter.offset === "number" ? filter.offset : 0;
+    q = q.range(off, off + filter.limit - 1);
+  }
+  const { data, error, count } = await q;
+  if (error) throw error;
+  return {
+    items: (data ?? []) as Briefing[],
+    total: count ?? data?.length ?? 0,
+  };
+}
+
 export async function listBriefingDates(): Promise<string[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
