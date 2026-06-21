@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { ModelParam, KeywordItem, TopicItem } from "@/types/briefing";
+import AdminGate from "@/components/AdminGate";
 
 export default function ModelPage() {
   const [items, setItems] = useState<ModelParam[]>([]);
@@ -178,6 +179,7 @@ export default function ModelPage() {
   }
 
   return (
+    <AdminGate>
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="mb-5 pb-4 border-b border-slate-800 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -395,6 +397,7 @@ ${active.exclude_words.join(", ")}
         </div>
       )}
     </div>
+    </AdminGate>
   );
 }
 

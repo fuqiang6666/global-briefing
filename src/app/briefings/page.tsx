@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Briefing, BriefingSection, ConfidenceLevel } from "@/types/briefing";
 import { SECTION_LABELS, CONFIDENCE_LABELS } from "@/types/briefing";
+import AdminGate from "@/components/AdminGate";
 
 type FilterState = {
   dateFrom: string;
@@ -224,6 +225,7 @@ export default function BriefingsPage() {
   const isFiltered = !isFilterEmpty(appliedFilter);
 
   return (
+    <AdminGate>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <div className="mb-5 pb-4 border-b border-slate-800 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -599,5 +601,6 @@ export default function BriefingsPage() {
         </div>
       )}
     </div>
+    </AdminGate>
   );
 }

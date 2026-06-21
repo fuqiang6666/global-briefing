@@ -17,6 +17,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { MediaSource } from "@/types/briefing";
+import AdminGate from "@/components/AdminGate";
 
 const TYPE_LABELS: Record<string, string> = {
   party: "党媒央刊",
@@ -232,6 +233,7 @@ export default function MediaPage() {
   });
 
   return (
+    <AdminGate>
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <Header
         title="媒体库管理"
@@ -573,6 +575,7 @@ export default function MediaPage() {
         </div>
       )}
     </div>
+    </AdminGate>
   );
 }
 

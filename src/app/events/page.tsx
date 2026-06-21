@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { FutureEvent, ConfidenceLevel, RelatedSymbol } from "@/types/briefing";
 import { CONFIDENCE_LABELS } from "@/types/briefing";
+import AdminGate from "@/components/AdminGate";
 
 const CATEGORIES = [
   { value: "macro", label: "宏观经济" },
@@ -140,6 +141,7 @@ export default function EventsPage() {
   });
 
   return (
+    <AdminGate>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <div className="mb-5 pb-4 border-b border-slate-800 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -393,6 +395,7 @@ export default function EventsPage() {
         </div>
       )}
     </div>
+    </AdminGate>
   );
 }
 
