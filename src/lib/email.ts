@@ -1,6 +1,6 @@
 // Email helper - re-exports from email-client and provides higher-level helpers
 
-import { sendEmail as sendEmailRaw, isEmailConfigured as isEmailConfiguredRaw, resolveSmtpConfig, clearSmtpCache } from "@/lib/email-client";
+import { sendEmail as sendEmailRaw, isEmailConfigured as isEmailConfiguredRaw, resolveSmtpConfig, clearSmtpCache, testSmtpConnection as testSmtpConnectionRaw } from "@/lib/email-client";
 
 export interface SendEmailOptions {
   to: string[];
@@ -26,6 +26,17 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ messageId: st
 
 export async function isEmailConfigured(): Promise<boolean> {
   return isEmailConfiguredRaw();
+}
+
+export async function testSmtpConnection(): Promise<{
+  ok: boolean;
+  error?: string;
+  source?: "database" | "identity" | "env" | "none";
+  host?: string;
+  port?: number;
+  user?: string;
+}> {
+  return testSmtpConnectionRaw();
 }
 
 export async function getEmailConfigInfo(): Promise<{

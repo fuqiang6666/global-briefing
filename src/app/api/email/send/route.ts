@@ -3,7 +3,7 @@ import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { listBriefingsByDate, createBriefing } from "@/storage/database/briefings";
 import { getEmailSettings, createEmailSendLog, updateEmailLastSent } from "@/storage/database/email";
 import { todayDateString } from "@/lib/date";
-import { SECTION_LABELS } from "@/types/briefing";
+import { SECTION_LABELS, parseVolatilityForecast, type VolatilityDirection } from "@/types/briefing";
 
 export const dynamic = "force-dynamic";
 
@@ -130,12 +130,19 @@ function buildEmailHtml(
     body += `<h2 style="font-size:16px;color:#0f172a;margin:24px 0 12px;padding:6px 12px;background:#fef3c7;border-left:3px solid #f59e0b;">${SECTION_LABELS[key]}</h2>`;
     for (const item of arr) {
       const detailLink = `${domain}/?date=${date}&item=${item.id}`;
+      const vol = item.volatility_forecast
+        ? parseVolatilityForecast(item.volatility_forecast, item.related_symbols)
+        : null;
+      const volChip = vol && vol.chip
+        ? `<span style="background:${volatilityBgColor(vol.direction)};color:${volatilityTextColor(vol.direction)};padding:1px 6px;border-radius:4px;margin-right:6px;">${escapeHtml(vol.chip)}</span>`
+        : "";
       body += `<div style="margin-bottom:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">
         <div style="font-size:14px;color:#0f172a;margin-bottom:6px;">${escapeHtml(item.title)}</div>
         <div style="font-size:13px;color:#475569;margin-bottom:8px;">${escapeHtml(item.body)}</div>
         <div style="font-size:12px;color:#64748b;">
           <span style="background:#e0f2fe;padding:1px 6px;border-radius:4px;margin-right:6px;">📰 ${escapeHtml(item.source)}</span>
           <span style="background:${confidenceColor(item.confidence)};padding:1px 6px;border-radius:4px;margin-right:6px;">置信度：${item.confidence === "high" ? "高" : item.confidence === "medium" ? "中" : "低"}</span>
+          ${volChip}
           <a href="${detailLink}" style="color:#2563eb;text-decoration:none;">详细分析 →</a>
         </div>
       </div>`;
@@ -171,7 +178,11 @@ function buildEmailText(
     if (!arr || arr.length === 0) continue;
     text += `\n== ${SECTION_LABELS[key]} ==\n`;
     for (const item of arr) {
-      text += `• ${item.title}\n  ${item.body}\n  [${item.source}] [置信度：${item.confidence}]\n\n`;
+      const vol = item.volatility_forecast
+        ? parseVolatilityForecast(item.volatility_forecast, item.related_symbols)
+        : null;
+      const volText = vol && vol.chip ? ` [${vol.chip}]` : "";
+      text += `• ${item.title}\n  ${item.body}\n  [${item.source}] [置信度：${item.confidence}]${volText}\n\n`;
     }
   }
   return text;
@@ -190,4 +201,16 @@ function confidenceColor(c: string): string {
   if (c === "high") return "#dcfce7";
   if (c === "medium") return "#fef3c7";
   return "#fee2e2";
+}
+
+function volatilityBgColor(d: VolatilityDirection): string {
+  if (d === "up") return "#dcfce7";
+  if (d === "down") return "#fee2e2";
+  return "#e0f2fe";
+}
+
+function volatilityTextColor(d: VolatilityDirection): string {
+  if (d === "up") return "#166534";
+  if (d === "down") return "#991b1b";
+  return "#0c4a6e";
 }

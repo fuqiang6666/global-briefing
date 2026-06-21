@@ -66,15 +66,23 @@ async function loadEmailConfigFromDatabase(): Promise<ResolvedSmtpConfig | null>
       smtp_from_email: string | null;
     };
     if (!row.smtp_host || !row.smtp_user || !row.smtp_pass) return null;
+    const port = row.smtp_port ?? 465;
+    // smtp_secure 字段优先；为空时按端口推断（465=true；587 STARTTLS=false）
+    const secure =
+      row.smtp_secure !== null && row.smtp_secure !== undefined
+        ? Boolean(row.smtp_secure)
+        : port === 465;
     return {
       host: row.smtp_host,
-      port: row.smtp_port ?? 465,
+      port,
       user: row.smtp_user,
       pass: row.smtp_pass,
       fromName: row.smtp_from_name ?? "全球要闻简报",
       fromEmail: row.smtp_from_email ?? row.smtp_user,
       source: "database",
-    };
+      // 透传 secure 供 sendEmail 使用
+      ...(secure !== undefined ? { _secure: secure } : {}),
+    } as ResolvedSmtpConfig & { _secure?: boolean };
   } catch {
     return null;
   }
@@ -135,14 +143,33 @@ export async function sendEmail(options: SendEmailOptions): Promise<{
     return { ok: false, error: "SMTP 凭据未配置" };
   }
   try {
+    const port = cfg.port || 465;
+    const explicitSecure = (cfg as ResolvedSmtpConfig & { _secure?: boolean })._secure;
+    const secure = explicitSecure !== undefined ? explicitSecure : port === 465;
     const transporter = nodemailer.createTransport({
       host: cfg.host,
-      port: cfg.port,
-      secure: cfg.port === 465,
+      port,
+      secure,
       auth: { user: cfg.user, pass: cfg.pass },
+      // QQ/163/阿里等国内邮件服务经常使用自签 CA；
+      // 在生产端可改为严格校验，这里默认放行以提升发送成功率。
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 15_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     const fromName = cfg.fromName || "全球要闻简报";
     const fromEmail = cfg.fromEmail || cfg.user;
+    // 验证 SMTP 凭据是否可用（避免鉴权失败时发送大量退信）
+    try {
+      await transporter.verify();
+    } catch (verifyErr: unknown) {
+      const vmsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+      return {
+        ok: false,
+        error: `SMTP 验证失败：${vmsg}（请检查主机/端口/账号/授权码是否正确）`,
+      };
+    }
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: options.to.join(", "),
@@ -153,6 +180,56 @@ export async function sendEmail(options: SendEmailOptions): Promise<{
     });
     return { ok: true, source: cfg.source };
   } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: `${msg}（若提示 EAUTH/认证失败，请确认是 SMTP 授权码而非登录密码；若提示 ECONNECTION/EAI_AGAIN，请检查主机或网络）`,
+    };
+  }
+}
+
+/**
+ * 仅测试 SMTP 连接与鉴权，不发送任何邮件。
+ * 用于「测试连接」按钮，避免误发邮件的前提下验证凭据。
+ */
+export async function testSmtpConnection(): Promise<{
+  ok: boolean;
+  error?: string;
+  source?: ResolvedSmtpConfig["source"];
+  host?: string;
+  port?: number;
+  user?: string;
+}> {
+  const cfg = await resolveSmtpConfig();
+  if (!cfg.host || !cfg.user || !cfg.pass) {
+    return { ok: false, error: "SMTP 凭据未配置" };
+  }
+  try {
+    const port = cfg.port || 465;
+    const explicitSecure = (cfg as ResolvedSmtpConfig & { _secure?: boolean })._secure;
+    const secure = explicitSecure !== undefined ? explicitSecure : port === 465;
+    const transporter = nodemailer.createTransport({
+      host: cfg.host,
+      port,
+      secure,
+      auth: { user: cfg.user, pass: cfg.pass },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 15_000,
+      greetingTimeout: 10_000,
+    });
+    await transporter.verify();
+    return {
+      ok: true,
+      source: cfg.source,
+      host: cfg.host,
+      port,
+      user: cfg.user,
+    };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: `${msg}`,
+    };
   }
 }

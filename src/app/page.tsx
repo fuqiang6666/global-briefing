@@ -27,6 +27,8 @@ import {
   SECTION_COUNT,
   CONFIDENCE_LABELS,
   CONFIDENCE_STYLES,
+  VOLATILITY_STYLES,
+  parseVolatilityForecast,
   type Briefing,
   type BriefingSection,
   type ConfidenceLevel,
@@ -478,11 +480,21 @@ function BriefingCard({
             >
               置信度 · {CONFIDENCE_LABELS[confidence]}
             </span>
-            {item.volatility_forecast && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
-                波动 {item.volatility_forecast}
-              </span>
-            )}
+            {item.volatility_forecast && (() => {
+              const v = parseVolatilityForecast(item.volatility_forecast, item.related_symbols);
+              if (!v.chip) return null;
+              return (
+                <span
+                  className={[
+                    "inline-flex items-center px-1.5 py-0.5 rounded border font-mono",
+                    VOLATILITY_STYLES[v.direction],
+                  ].join(" ")}
+                  title={item.volatility_forecast}
+                >
+                  {v.chip}
+                </span>
+              );
+            })()}
             {item.event_date && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono">
                 📅 {item.event_date}
@@ -552,11 +564,21 @@ function DetailModal({
               >
                 置信度 · {CONFIDENCE_LABELS[confidence]}
               </span>
-              {item.volatility_forecast && (
-                <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
-                  波动 {item.volatility_forecast}
-                </span>
-              )}
+              {item.volatility_forecast && (() => {
+                const v = parseVolatilityForecast(item.volatility_forecast, item.related_symbols);
+                if (!v.chip) return null;
+                return (
+                  <span
+                    className={[
+                      "px-1.5 py-0.5 rounded border font-mono",
+                      VOLATILITY_STYLES[v.direction],
+                    ].join(" ")}
+                    title={item.volatility_forecast}
+                  >
+                    {v.chip}
+                  </span>
+                );
+              })()}
               {item.event_date && (
                 <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono">
                   📅 {item.event_date}

@@ -14,6 +14,7 @@ import {
   Inbox,
   Link2,
   Settings2,
+  PlugZap,
 } from "lucide-react";
 import type { EmailSettings, EmailSendLog } from "@/types/briefing";
 import { isEmailConfigured } from "@/lib/email-client";
@@ -38,6 +39,7 @@ export default function EmailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [draft, setDraft] = useState<Partial<EmailSettings>>({});
   const [newRecipient, setNewRecipient] = useState("");
   const [newCc, setNewCc] = useState("");
@@ -116,17 +118,34 @@ export default function EmailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ test: false }),
       });
-      const json = await res.json();
+      const json = await safeJson<{ success: boolean; error?: string }>(res);
       if (json.success) {
         setToast({ type: "ok", msg: "已发送" });
         await load();
       } else {
-        setToast({ type: "err", msg: json.error });
+        setToast({ type: "err", msg: json.error ?? "发送失败" });
       }
     } catch (e: unknown) {
       setToast({ type: "err", msg: e instanceof Error ? e.message : String(e) });
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleTestConnection() {
+    setTesting(true);
+    try {
+      const res = await fetch("/api/email/test", { method: "POST" });
+      const json = await safeJson<{ success: boolean; error?: string; message?: string }>(res);
+      if (json.success) {
+        setToast({ type: "ok", msg: json.message ?? "SMTP 连接成功" });
+      } else {
+        setToast({ type: "err", msg: json.error ?? "连接失败" });
+      }
+    } catch (e: unknown) {
+      setToast({ type: "err", msg: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -394,6 +413,20 @@ export default function EmailPage() {
                 <Send className="w-3.5 h-3.5" />
               )}
               立即发送今日简报
+            </button>
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={testing || !emailConfigured}
+              className="px-4 py-2 text-sm rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 flex items-center gap-1.5 disabled:opacity-50"
+              title="仅测试 SMTP 连接与鉴权，不发送邮件"
+            >
+              {testing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <PlugZap className="w-3.5 h-3.5" />
+              )}
+              测试连接
             </button>
           </div>
         </div>

@@ -28,6 +28,86 @@ export const CONFIDENCE_STYLES: Record<ConfidenceLevel, string> = {
   low: "bg-rose-500/15 text-rose-400 border-rose-500/30",
 };
 
+/** 涨/跌 方向；用于波动区间展示。 */
+export type VolatilityDirection = "up" | "down" | "neutral";
+
+/** 涨/跌 颜色样式（与设计规范保持一致） */
+export const VOLATILITY_STYLES: Record<VolatilityDirection, string> = {
+  up: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  down: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  neutral: "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
+};
+
+/**
+ * 把 LLM 输出的波动区间（如 "某板块 +1.5%~+2.3%" / "美元 ±0.5%~±1.0%" / "黄金 -0.3%~-0.7%"）
+ * 解析为统一的方向 + 区间字符串。
+ *
+ * 优先级：
+ * 1. 区间两端若同号（++/--），方向由符号决定
+ * 2. 区间是 ±（双向）或符号不一致，回退到 related_symbols.impact 投票
+ * 3. 都没有则保持 neutral
+ */
+export function parseVolatilityForecast(
+  forecast: string | null | undefined,
+  symbols?: RelatedSymbol[],
+): { direction: VolatilityDirection; range: string; chip: string } {
+  const empty = { direction: "neutral" as VolatilityDirection, range: "", chip: "" };
+  if (!forecast) return empty;
+  const raw = forecast.trim();
+  if (!raw) return empty;
+
+  // 抽取主体（板块/标的等中文片段）和"区间"部分
+  // 兼容 "~" / "-" / "–" / "到" / "至" 等分隔符
+  const rangeMatch = raw.match(
+    /([+\-±]?\s*\d+(?:\.\d+)?\s*%?\s*[~\-–到至]\s*[+\-±]?\s*\d+(?:\.\d+)?\s*%?)/,
+  );
+  let subject = "";
+  let range = raw;
+  if (rangeMatch && rangeMatch.index !== undefined) {
+    range = rangeMatch[1].replace(/\s+/g, "").replace(/[–到至]/g, "~");
+    subject = raw.slice(0, rangeMatch.index).trim();
+  }
+
+  // 解析方向
+  const parts = range.split("~");
+  const left = parts[0] ?? "";
+  const right = parts[1] ?? "";
+  const lSign = left.trim().startsWith("-") ? "-" : left.trim().startsWith("+") ? "+" : left.trim().startsWith("±") ? "±" : "";
+  const rSign = right.trim().startsWith("-") ? "-" : right.trim().startsWith("+") ? "+" : right.trim().startsWith("±") ? "±" : "";
+
+  let direction: VolatilityDirection = "neutral";
+  if (lSign && rSign) {
+    if (lSign === "+" && rSign === "+") direction = "up";
+    else if (lSign === "-" && rSign === "-") direction = "down";
+    // "+/~±" 或 "±/-" 等混号：方向由 impact 兜底
+  }
+
+  // 用 related_symbols 兜底
+  if (direction === "neutral" && symbols && symbols.length > 0) {
+    const pos = symbols.filter((s) => s.impact === "positive").length;
+    const neg = symbols.filter((s) => s.impact === "negative").length;
+    if (pos > neg) direction = "up";
+    else if (neg > pos) direction = "down";
+  }
+
+  // 区间归一化展示：
+  // - up:   "+1.5%~+2.3%" / "±1.5%~±2.3%" -> "1.5%~2.3%"（前缀 "涨" 暗示向上）
+  // - down: "-1.5%~-2.3%" / "±1.5%~±2.3%" -> "1.5%~2.3%"（前缀 "跌" 暗示向下；区间取绝对值更易读）
+  // - neutral: 保留原始区间（去掉 ± 字符）
+  let displayRange = range;
+  if (direction === "up" || direction === "down") {
+    // 去掉所有 +/-/± 符号，区间数字保留为正值
+    displayRange = range.replace(/[+\-±]/g, "");
+  } else {
+    displayRange = range.replace(/±/g, "");
+  }
+
+  const label = direction === "up" ? "涨" : direction === "down" ? "跌" : "波动";
+  const prefix = subject ? `${subject} ` : "";
+  const chip = `${label} ${prefix}${displayRange}`.trim();
+  return { direction, range: displayRange, chip };
+}
+
 export interface MediaSource {
   id: string;
   name: string;

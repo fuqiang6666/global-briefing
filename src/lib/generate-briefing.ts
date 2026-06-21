@@ -209,10 +209,12 @@ function buildSelectionPrompt(input: SelectionPromptInput): string {
 2. title 简明扼要
 3. confidence 必须是 high/medium/low 之一
 4. detailed_analysis 用 Markdown，包含 ## 影响逻辑 / ## 受影响标的 / ## 波动区间 三个小节
-5. volatility_forecast 形如"某板块 ±1.5%~±2.3%"或"美元 ±0.5%~±1.0%"
+5. volatility_forecast 形如"某板块 +1.5%~+2.3%"（看多）或"美元 -0.5%~-1.0%"（看空），两端的正负号必须一致；
+   如果无法判断方向，输出"某板块 ±0.8%~±1.5%"（±表示双向波动），将由前端结合 related_symbols.impact 决定显示"涨/跌"
 6. source 必须从以下媒体库中挑选最匹配的一个：${sourceList}
 7. event_date 仅 weekly_event 类型必填（YYYY-MM-DD），其他类型填 null
 8. related_symbols 数组，元素格式 {"type":"stock/future/option","name":"...","code":"...","impact":"positive/negative/neutral"}
+   其中 impact 强烈建议与 volatility_forecast 的方向一致（涨 → positive；跌 → negative）
 
 输出严格 JSON，格式：
 {
