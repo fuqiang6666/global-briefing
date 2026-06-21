@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Home, Library, BrainCircuit, Inbox, Mail, LineChart, X } from "lucide-react";
+import { Home, Library, BrainCircuit, Inbox, LineChart, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 
 const NAV_ITEMS = [
@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/media", label: "媒体", icon: Library },
   { href: "/model", label: "模型", icon: BrainCircuit },
   { href: "/briefings", label: "记录", icon: Inbox },
-  { href: "/email", label: "邮件", icon: Mail },
+  { href: "/admin", label: "后台", icon: ShieldCheck },
 ];
 
 export default function MobileNav() {

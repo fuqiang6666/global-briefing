@@ -7,9 +7,8 @@ import {
   Library,
   BrainCircuit,
   Inbox,
-  Mail,
-  Calendar,
   LineChart,
+  ShieldCheck,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -18,7 +17,7 @@ const NAV_ITEMS = [
   { href: "/media", label: "媒体库", icon: Library, match: (p: string) => p.startsWith("/media") },
   { href: "/model", label: "模型逻辑", icon: BrainCircuit, match: (p: string) => p.startsWith("/model") },
   { href: "/briefings", label: "简报管理", icon: Inbox, match: (p: string) => p.startsWith("/briefings") },
-  { href: "/email", label: "邮件设置", icon: Mail, match: (p: string) => p.startsWith("/email") },
+  { href: "/admin", label: "管理后台", icon: ShieldCheck, match: (p: string) => p.startsWith("/admin") },
 ];
 
 export default function Sidebar() {

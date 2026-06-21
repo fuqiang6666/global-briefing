@@ -10,7 +10,8 @@ const TITLES: Record<string, string> = {
   "/media": "媒体库",
   "/model": "模型逻辑",
   "/briefings": "简报管理",
-  "/email": "邮件设置",
+  "/admin": "管理后台",
+  "/admin/email": "邮件设置（后台）",
 };
 
 export default function TopBar() {
