@@ -16,6 +16,8 @@ export const SECTION_COUNT: Record<BriefingSection, number> = {
   weekly_event: 5,
 };
 
+export const SECTION_ORDER: BriefingSection[] = ["long_term", "domestic_impact", "weekly_event"];
+
 export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
   high: "高",
   medium: "中",
