@@ -136,7 +136,19 @@ export async function runScheduledTask(
     };
   }
 
-  const recipients = options.overrideRecipients ?? settings.recipients;
+  // 确保 recipients 是数组（数据库可能存储为字符串，与类型定义不一致）
+  const rawRecipients: unknown = options.overrideRecipients ?? settings.recipients;
+  const recipients = Array.isArray(rawRecipients)
+    ? rawRecipients
+    : typeof rawRecipients === "string" && rawRecipients.trim()
+      ? [rawRecipients.trim()]
+      : [];
+  const rawCc: unknown = settings.cc_recipients;
+  const ccRecipients = Array.isArray(rawCc)
+    ? rawCc
+    : typeof rawCc === "string" && rawCc.trim()
+      ? [rawCc.trim()]
+      : [];
   const isTimeMatch =
     settings.send_hour === hour && settings.send_minute === minute;
   const shouldSend =
@@ -172,7 +184,7 @@ export async function runScheduledTask(
   try {
     await sendEmail({
       to: recipients,
-      cc: settings.cc_recipients,
+      cc: ccRecipients,
       subject,
       html,
       text,
@@ -227,7 +239,14 @@ function shouldTriggerNow(
   if (!settings) return { should: false, reason: "邮件未配置" };
   if (!settings.enabled)
     return { should: false, reason: "邮件总开关未开启" };
-  if (settings.recipients.length === 0)
+  // 确保 recipients 是数组（数据库可能存储为字符串）
+  const rawRecipients: unknown = settings.recipients;
+  const recipients = Array.isArray(rawRecipients)
+    ? rawRecipients
+    : typeof rawRecipients === "string" && rawRecipients.trim()
+      ? [rawRecipients.trim()]
+      : [];
+  if (recipients.length === 0)
     return { should: false, reason: "未配置收件人" };
   const hour = getBeijingHour(now);
   const minute = getBeijingMinute(now);
