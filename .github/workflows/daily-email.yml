@@ -1,0 +1,51 @@
+name: Daily Email Briefing
+
+on:
+  schedule:
+    # UTC 00:01 = 北京时间 08:01 (UTC+8)
+    - cron: '1 0 * * *'
+  workflow_dispatch:
+    # 允许手动触发测试
+
+jobs:
+  send-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Trigger daily briefing cron API
+        run: |
+          echo "Triggering daily briefing at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          
+          RESPONSE=$(curl -s -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"secret":"global-briefing-default-secret"}' \
+            -w "\nHTTP_STATUS:%{http_code}" \
+            https://df675843-a9b6-4c68-ad0f-75f574b88fc8.dev.coze.site/api/cron/daily)
+          
+          HTTP_BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+          HTTP_STATUS=$(echo "$RESPONSE" | grep 'HTTP_STATUS:' | cut -d: -f2)
+          
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response: $HTTP_BODY"
+          
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::API request failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          
+          # 检查响应中的 emailStatus
+          EMAIL_STATUS=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('emailStatus','-'))" 2>/dev/null || echo "-")
+          
+          if [ "$EMAIL_STATUS" = "failed" ]; then
+            echo "::warning::Email send failed, check the response for details"
+          else
+            echo "Email status: $EMAIL_STATUS"
+          fi
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Daily Briefing Result" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "Target time: 08:01 Beijing Time" >> $GITHUB_STEP_SUMMARY
