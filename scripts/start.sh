@@ -6,6 +6,9 @@ COZE_WORKSPACE_PATH="${COZE_WORKSPACE_PATH:-$(pwd)}"
 PORT=5000
 DEPLOY_RUN_PORT="${DEPLOY_RUN_PORT:-$PORT}"
 
+# 生产环境必须设置 COZE_PROJECT_ENV=PROD
+export COZE_PROJECT_ENV=PROD
+export NODE_ENV=production
 
 start_service() {
     cd "${COZE_WORKSPACE_PATH}"
