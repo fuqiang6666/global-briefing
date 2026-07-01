@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { execSync } from "node:child_process";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 export interface ResolvedSmtpConfig {
@@ -16,33 +15,16 @@ let cachedConfig: ResolvedSmtpConfig | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 30_000;
 
-function loadEmailConfigFromIdentity(): ResolvedSmtpConfig {
-  try {
-    const out = execSync(
-      "python3 -c \"from coze_workload_identity import Client; c=Client(); r=c.get_email_credentials(); print(r.get('smtp_host','')); print(r.get('smtp_port','465')); print(r.get('smtp_user','')); print(r.get('smtp_password','')); print(r.get('from_address',''))\"",
-      { encoding: "utf-8", timeout: 10000 },
-    );
-    const lines = out.trim().split("\n");
-    return {
-      host: lines[0] ?? "",
-      port: Number(lines[1] ?? "465") || 465,
-      user: lines[2] ?? "",
-      pass: lines[3] ?? "",
-      fromName: "全球要闻简报",
-      fromEmail: lines[4] ?? "",
-      source: "identity" as const,
-    };
-  } catch {
-    return {
-      host: "",
-      port: Number(process.env.SMTP_PORT ?? "465") || 465,
-      user: process.env.SMTP_USER ?? "",
-      pass: process.env.SMTP_PASS ?? "",
-      fromName: process.env.SMTP_FROM_NAME ?? "全球要闻简报",
-      fromEmail: process.env.SMTP_FROM_EMAIL ?? process.env.SMTP_USER ?? "",
-      source: "env" as const,
-    };
-  }
+function loadEmailConfigFromEnv(): ResolvedSmtpConfig {
+  return {
+    host: process.env.SMTP_HOST ?? "",
+    port: Number(process.env.SMTP_PORT ?? "465") || 465,
+    user: process.env.SMTP_USER ?? "",
+    pass: process.env.SMTP_PASS ?? "",
+    fromName: process.env.SMTP_FROM_NAME ?? "全球要闻简报",
+    fromEmail: process.env.SMTP_FROM_EMAIL ?? process.env.SMTP_USER ?? "",
+    source: "env" as const,
+  };
 }
 
 async function loadEmailConfigFromDatabase(): Promise<ResolvedSmtpConfig | null> {
@@ -99,10 +81,10 @@ export async function resolveSmtpConfig(): Promise<ResolvedSmtpConfig> {
     cacheTimestamp = now;
     return fromDb;
   }
-  const fromIdentity = loadEmailConfigFromIdentity();
-  cachedConfig = fromIdentity;
+  const fromEnv = loadEmailConfigFromEnv();
+  cachedConfig = fromEnv;
   cacheTimestamp = now;
-  return fromIdentity;
+  return fromEnv;
 }
 
 export function clearSmtpCache(): void {

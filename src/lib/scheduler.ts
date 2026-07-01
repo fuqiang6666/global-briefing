@@ -236,7 +236,7 @@ export async function runScheduledTask(
       date,
       time: timeStr,
       generatedCount,
-      industryAnalysisCount,
+      industryAnalysisCount: industryItems.length,
       emailStatus: "sent",
       logId: log.id,
     };
@@ -257,6 +257,7 @@ export async function runScheduledTask(
       date,
       time: timeStr,
       generatedCount,
+      industryAnalysisCount: industryItems.length,
       emailStatus: "failed",
       emailError: msg,
     };
