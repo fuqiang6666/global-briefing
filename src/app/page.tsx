@@ -21,6 +21,7 @@ import {
   BrainCircuit,
   Loader2,
   X,
+  Factory,
 } from "lucide-react";
 import {
   SECTION_LABELS,
@@ -32,6 +33,7 @@ import {
   type Briefing,
   type BriefingSection,
   type ConfidenceLevel,
+  type IndustryAnalysis,
 } from "@/types/briefing";
 
 const SECTION_ORDER: BriefingSection[] = [
@@ -91,6 +93,7 @@ export function HomePage() {
   const initialDate = searchParams.get("date") ?? todayStr();
   const [date, setDate] = useState(initialDate);
   const [items, setItems] = useState<Briefing[]>([]);
+  const [industryItems, setIndustryItems] = useState<IndustryAnalysis[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -114,6 +117,12 @@ export function HomePage() {
         router.replace(`/?${newParams.toString()}`, { scroll: false });
       } else {
         setToast({ type: "err", msg: json.error || "加载失败" });
+      }
+      // Load industry analysis
+      const indRes = await fetch(`/api/industry-analysis?date=${d}`, { cache: "no-store" });
+      const indJson = await indRes.json();
+      if (indJson.items) {
+        setIndustryItems(indJson.items);
       }
     } catch (e: unknown) {
       setToast({ type: "err", msg: e instanceof Error ? e.message : String(e) });
@@ -365,6 +374,10 @@ export function HomePage() {
                 />
               );
             })}
+            {/* Industry Analysis Section */}
+            {industryItems.length > 0 && (
+              <IndustrySection items={industryItems} />
+            )}
           </div>
         )}
       </div>
@@ -751,4 +764,160 @@ function formatInline(text: string): string {
   return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/`(.+?)`/g, "<code>$1</code>");
+}
+
+// Industry Analysis Section Component
+function IndustrySection({ items }: { items: IndustryAnalysis[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  
+  return (
+    <section>
+      <div className="flex items-end justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Factory className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-slate-100 tracking-tight">
+              热点产业分析
+              <span className="ml-2 text-xs font-mono text-slate-500">
+                {items.length} 个产业
+              </span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              政策 · 产业链 · 产能 · 技术发展
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        {items.map((ind, idx) => (
+          <div
+            key={ind.id || idx}
+            className="bg-[var(--panel)] border border-[var(--border)] rounded-md overflow-hidden"
+          >
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-[var(--border)]">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs text-amber-400">
+                      #{String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span
+                      className={[
+                        "inline-block px-1.5 py-0.5 rounded text-xs font-semibold",
+                        CONFIDENCE_STYLES[ind.confidence || "medium"],
+                      ].join(" ")}
+                    >
+                      置信度 · {CONFIDENCE_LABELS[ind.confidence || "medium"]}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-medium text-slate-100">
+                    {ind.industry_name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpanded(expanded === idx ? null : idx)}
+                  className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400"
+                >
+                  {expanded === idx ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              
+              {/* Related symbols */}
+              {ind.related_symbols && ind.related_symbols.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {ind.related_symbols.map((s, i) => (
+                    <span
+                      key={i}
+                      className={[
+                        "inline-block px-2 py-0.5 rounded text-xs font-mono",
+                        s.impact === "positive"
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : s.impact === "negative"
+                          ? "bg-rose-500/15 text-rose-400"
+                          : "bg-slate-500/15 text-slate-400",
+                      ].join(" ")}
+                    >
+                      {s.name}
+                      {s.impact === "positive" ? " ↑" : s.impact === "negative" ? " ↓" : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Expanded content */}
+            {expanded === idx && (
+              <div className="px-4 py-3 space-y-3 text-sm">
+                <div>
+                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+                    <span className="text-xs">▎</span>
+                    <span className="font-medium">政策分析</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{ind.policy_analysis}</p>
+                </div>
+                
+                <div>
+                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+                    <span className="text-xs">▎</span>
+                    <span className="font-medium">产业链分析</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{ind.chain_analysis}</p>
+                </div>
+                
+                <div>
+                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+                    <span className="text-xs">▎</span>
+                    <span className="font-medium">产能重点</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{ind.capacity_focus}</p>
+                </div>
+                
+                <div>
+                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+                    <span className="text-xs">▎</span>
+                    <span className="font-medium">技术发展</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{ind.tech_development}</p>
+                </div>
+                
+                {ind.market_outlook && (
+                  <div>
+                    <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+                      <span className="text-xs">▎</span>
+                      <span className="font-medium">市场展望</span>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed">{ind.market_outlook}</p>
+                  </div>
+                )}
+                
+                {/* Footer */}
+                <div className="pt-2 border-t border-[var(--border)] text-xs text-slate-500">
+                  出处 · {ind.source || "—"}
+                  {ind.source_url && (
+                    <a
+                      href={ind.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-amber-400 hover:text-amber-300"
+                    >
+                      原文 →
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

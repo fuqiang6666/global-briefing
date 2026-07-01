@@ -4,7 +4,7 @@ import { llmInvoke } from "@/lib/llm";
 import { getEnabledMediaSources } from "@/storage/database/media-sources";
 import { getActiveModelParam } from "@/storage/database/model-params";
 import { addDays, todayDateString } from "@/lib/date";
-import type { Briefing, ModelParam, MediaSource, BriefingSection, ConfidenceLevel, RelatedSymbol } from "@/types/briefing";
+import type { Briefing, ModelParam, MediaSource, BriefingSection, ConfidenceLevel, RelatedSymbol, IndustryAnalysisInsert } from "@/types/briefing";
 
 export interface GeneratedItem {
   section: BriefingSection;
@@ -20,9 +20,23 @@ export interface GeneratedItem {
   event_date: string | null;
 }
 
+export interface GeneratedIndustryAnalysis {
+  industry_name: string;
+  policy_analysis: string;
+  chain_analysis: string;
+  capacity_focus: string;
+  tech_development: string;
+  market_outlook: string | null;
+  related_symbols: RelatedSymbol[];
+  confidence: ConfidenceLevel;
+  source: string | null;
+  source_url: string | null;
+}
+
 export interface GenerateResult {
   date: string;
   items: GeneratedItem[];
+  industry_analysis: GeneratedIndustryAnalysis[];
   modelVersion: number | null;
   searches: number;
   usedSources: string[];
@@ -88,11 +102,44 @@ export async function generateBriefingForDate(
   if (items.length < 10) {
     throw new Error(`AI 仅生成 ${items.length} 条，需 10 条`);
   }
+
+  // 生成热点产业分析
+  const industryQueries = buildIndustryQueries(keywords, topicPrefs);
+  const industrySearchResults: { query: string; items: { title: string; url: string; snippet: string; source?: string }[] }[] = [];
+  for (const q of industryQueries.slice(0, 4)) {
+    try {
+      const res = await webSearch(q, 10);
+      industrySearchResults.push({ query: q, items: res.items });
+    } catch (e) {
+      industrySearchResults.push({ query: q, items: [] });
+    }
+  }
+  const industryAllItems = aggregateSearchResults(industrySearchResults);
+  const industryFiltered = filterItems(industryAllItems, excludeWords);
+  const industryDeduped = dedupeByTitle(industryFiltered);
+
+  const industryPrompt = buildIndustryAnalysisPrompt({
+    date,
+    candidates: industryDeduped.slice(0, 30),
+    mediaSources: sources.slice(0, 25),
+  });
+
+  const industryResult = await llmInvoke(
+    [
+      { role: "system", content: INDUSTRY_SYSTEM_PROMPT },
+      { role: "user", content: industryPrompt },
+    ],
+    { temperature: 0.5, maxTokens: 4000 },
+  );
+
+  const industryAnalysis = parseGeneratedIndustryAnalysis(industryResult, sources);
+
   return {
     date,
     items: items.slice(0, 10),
+    industry_analysis: industryAnalysis,
     modelVersion: model?.version ?? null,
-    searches: searchResults.length,
+    searches: searchResults.length + industrySearchResults.length,
     usedSources: sources.map((s) => s.name),
   };
 }
@@ -278,4 +325,124 @@ function parseGeneratedItems(
     }
   }
   return items;
+}
+
+// ========== 热点产业分析 ==========
+
+const INDUSTRY_SYSTEM_PROMPT = `你是资深产业分析师，擅长从政策、产业链、产能和技术角度深度分析热点产业，为投资决策提供参考。`;
+
+function buildIndustryQueries(
+  keywords: { word: string; weight: number }[],
+  topics: { topic: string; weight: number }[],
+): string[] {
+  const queries: string[] = [];
+  
+  // 高权重关键词 → 产业深度分析
+  const highK = keywords.filter((k) => k.weight >= 7).slice(0, 3).map((k) => k.word);
+  const highT = topics.filter((t) => t.weight >= 7).slice(0, 2).map((t) => t.topic);
+  
+  for (const k of highK) {
+    queries.push(`${k} 产业链分析 最新政策`);
+    queries.push(`${k} 技术发展 产能布局`);
+  }
+  for (const t of highT) {
+    queries.push(`${t} 产业政策 投资机会`);
+  }
+  
+  // 通用的热点产业搜索
+  queries.push("热门赛道 产业链深度分析");
+  queries.push("新能源 人工智能 产业政策");
+  
+  return queries;
+}
+
+interface IndustryPromptInput {
+  date: string;
+  candidates: SearchItem[];
+  mediaSources: MediaSource[];
+}
+
+function buildIndustryAnalysisPrompt(input: IndustryPromptInput): string {
+  const candidateList = input.candidates
+    .map(
+      (c, i) =>
+        `${i + 1}. [${c.source ?? "未知媒体"}] ${c.title}\n   ${c.snippet}\n   ${c.url}`,
+    )
+    .join("\n\n");
+
+  const sourceList = input.mediaSources
+    .map((s) => `${s.name}(${s.type}/${s.region})`)
+    .join(", ");
+
+  return `日期：${input.date}
+
+任务：基于候选新闻，生成 1-2 个热点产业的深度分析报告。
+
+每个产业分析包含以下内容：
+1. industry_name: 产业名称（如"新能源汽车"、"人工智能"、"半导体"等）
+2. policy_analysis: 政策分析（当前相关政策、法规、补贴等，约100-150字）
+3. chain_analysis: 产业链分析（上游原材料、中游制造、下游应用，约150字）
+4. capacity_focus: 产能重点（当前产能分布、龙头企业产能、产能缺口，约100字）
+5. tech_development: 技术发展（最新技术突破、技术路线、技术瓶颈，约100字）
+6. market_outlook: 市场展望（未来趋势、投资机会、风险提示，约80字，可选）
+7. related_symbols: 相关标的数组，格式 {"type":"stock/future/option","name":"...","code":"...","impact":"positive/negative/neutral"}
+8. confidence: high/medium/low
+9. source: 来源媒体名（从 ${sourceList} 中选）
+
+输出严格 JSON，格式：
+{
+  "industries": [
+    {
+      "industry_name": "...",
+      "policy_analysis": "...",
+      "chain_analysis": "...",
+      "capacity_focus": "...",
+      "tech_development": "...",
+      "market_outlook": "...",
+      "related_symbols": [...],
+      "confidence": "high|medium|low",
+      "source": "媒体名",
+      "source_url": "URL或null"
+    }
+  ]
+}
+
+候选新闻：
+${candidateList || "（暂无候选）"}
+
+只输出 JSON，不要任何额外说明。`;
+}
+
+function parseGeneratedIndustryAnalysis(
+  raw: string,
+  sources: MediaSource[],
+): GeneratedIndustryAnalysis[] {
+  let parsed: { industries?: GeneratedIndustryAnalysis[] } = {};
+  try {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return [];
+    parsed = JSON.parse(match[0]);
+  } catch {
+    return [];
+  }
+  
+  const industries = (parsed.industries ?? []).filter(
+    (i): i is GeneratedIndustryAnalysis =>
+      i && typeof i.industry_name === "string" && typeof i.policy_analysis === "string",
+  );
+  
+  for (const it of industries) {
+    if (!it.confidence) it.confidence = "medium";
+    if (!it.source) it.source = "未知媒体";
+    if (!it.related_symbols || !Array.isArray(it.related_symbols)) {
+      it.related_symbols = [];
+    }
+    // 确保字段不为空
+    if (!it.chain_analysis) it.chain_analysis = "暂无产业链分析";
+    if (!it.capacity_focus) it.capacity_focus = "暂无产能重点信息";
+    if (!it.tech_development) it.tech_development = "暂无技术发展信息";
+    if (!it.market_outlook) it.market_outlook = null;
+  }
+  
+  return industries;
 }

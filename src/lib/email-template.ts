@@ -1,5 +1,5 @@
 // 每日简报邮件模板（HTML / 纯文本）
-import type { Briefing, EmailSettings } from "@/types/briefing";
+import type { Briefing, EmailSettings, IndustryAnalysis } from "@/types/briefing";
 import { SECTION_LABELS, CONFIDENCE_LABELS, SECTION_ORDER } from "@/types/briefing";
 import { parseVolatilityForecast } from "@/types/briefing";
 
@@ -42,11 +42,84 @@ function groupBySection(items: Briefing[]): Array<{
   }));
 }
 
+// 产业分析 HTML 模板
+function buildIndustryAnalysisHtml(items: IndustryAnalysis[]): string {
+  if (!items || items.length === 0) return "";
+  
+  return items.map((ind, idx) => {
+    const confidenceStyle = ind.confidence === "high"
+      ? "background:rgba(61,163,122,0.15);color:#3DA37A;"
+      : ind.confidence === "medium"
+      ? "background:rgba(212,162,76,0.18);color:#D4A24C;"
+      : "background:rgba(123,132,153,0.18);color:#7B8499;";
+    
+    const relatedSymbols = ind.related_symbols?.length > 0
+      ? ind.related_symbols.map(s => `${s.name}(${s.impact === "positive" ? "+" : s.impact === "negative" ? "-" : "~"})`).join(" ")
+      : "";
+    
+    return `
+      <tr>
+        <td style="padding:20px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111726;border:1px solid #1E2638;border-radius:6px;padding:16px;">
+            <tr>
+              <td style="padding:12px 16px;">
+                <div style="font-size:13px;color:#7B8499;margin-bottom:6px;">
+                  <span style="color:#D4A24C;font-weight:600;">#${String(idx + 1).padStart(2, "0")}</span>
+                  <span style="display:inline-block;padding:1px 8px;margin-left:8px;font-size:11px;font-weight:600;border-radius:3px;${confidenceStyle}">置信度 · ${CONFIDENCE_LABELS[ind.confidence] ?? ind.confidence}</span>
+                </div>
+                <div style="font-size:18px;color:#E8EAF0;font-weight:600;margin-bottom:12px;">${escapeHtml(ind.industry_name)} · 热点产业分析</div>
+                
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎政策分析</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.policy_analysis)}</div>
+                </div>
+                
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎产业链分析</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.chain_analysis)}</div>
+                </div>
+                
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎产能重点</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.capacity_focus)}</div>
+                </div>
+                
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎技术发展</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.tech_development)}</div>
+                </div>
+                
+                ${ind.market_outlook ? `
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎市场展望</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.market_outlook)}</div>
+                </div>` : ""}
+                
+                ${relatedSymbols ? `
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1E2638;">
+                  <div style="font-size:12px;color:#7B8499;">
+                    <span style="color:#D4A24C;">相关标的：</span> ${escapeHtml(relatedSymbols)}
+                  </div>
+                </div>` : ""}
+                
+                <div style="font-size:12px;color:#7B8499;margin-top:8px;">
+                  出处 · ${escapeHtml(ind.source || "—")}
+                  ${ind.source_url ? ` · <a href="${escapeHtml(ind.source_url)}" style="color:#D4A24C;text-decoration:none;">原文</a>` : ""}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
 export function buildEmailHtml(
   date: string,
   items: Briefing[],
   settings: EmailSettings,
   domain: string,
+  industryItems: IndustryAnalysis[] = [],
 ): string {
   const groups = groupBySection(items);
   const sectionsHtml = groups
@@ -130,6 +203,19 @@ export function buildEmailHtml(
           ${items.length === 0
             ? `<tr><td style="padding:60px 0;text-align:center;color:#7B8499;">今日暂无简报</td></tr>`
             : sectionsHtml}
+          ${industryItems.length > 0
+            ? `
+          <tr>
+            <td style="padding:28px 0 8px;">
+              <div style="display:flex;align-items:baseline;gap:10px;">
+                <span style="display:inline-block;width:4px;height:18px;background:#D4A24C;"></span>
+                <span style="font-size:17px;color:#E8EAF0;font-weight:600;">热点产业分析</span>
+                <span style="font-size:12px;color:#7B8499;font-family:'JetBrains Mono',monospace;">${String(industryItems.length).padStart(2, "0")} 个</span>
+              </div>
+            </td>
+          </tr>
+          ${buildIndustryAnalysisHtml(industryItems)}`
+            : ""}
           ${footerLinks.length > 0
             ? `<tr><td style="padding:24px 0 8px;border-top:1px solid #1E2638;font-size:12px;color:#7B8499;">${footerLinks.join("")}</td></tr>`
             : ""}
@@ -146,7 +232,7 @@ export function buildEmailHtml(
 </html>`;
 }
 
-export function buildEmailText(date: string, items: Briefing[]): string {
+export function buildEmailText(date: string, items: Briefing[], industryItems: IndustryAnalysis[] = []): string {
   const groups = groupBySection(items);
   const lines: string[] = [];
   lines.push(`每日全球要闻简报 · ${date}`);
@@ -168,6 +254,26 @@ export function buildEmailText(date: string, items: Briefing[]): string {
         lines.push("");
       });
     }
+  }
+  // 产业分析
+  if (industryItems.length > 0) {
+    lines.push("");
+    lines.push(`【热点产业分析】 ${industryItems.length} 个`);
+    lines.push("-".repeat(28));
+    industryItems.forEach((ind, i) => {
+      lines.push(`${i + 1}. ${ind.industry_name}`);
+      lines.push(`   政策分析：${ind.policy_analysis}`);
+      lines.push(`   产业链分析：${ind.chain_analysis}`);
+      lines.push(`   产能重点：${ind.capacity_focus}`);
+      lines.push(`   技术发展：${ind.tech_development}`);
+      if (ind.market_outlook) lines.push(`   市场展望：${ind.market_outlook}`);
+      if (ind.related_symbols?.length > 0) {
+        const symbols = ind.related_symbols.map(s => `${s.name}(${s.impact === "positive" ? "+" : s.impact === "negative" ? "-" : "~"})`).join(" ");
+        lines.push(`   相关标的：${symbols}`);
+      }
+      lines.push(`   置信度：${CONFIDENCE_LABELS[ind.confidence] ?? ind.confidence}`);
+      lines.push("");
+    });
   }
   return lines.join("\n");
 }

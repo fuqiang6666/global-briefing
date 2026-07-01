@@ -226,3 +226,52 @@ export interface EmailSendLog {
   item_count: number;
   created_at: string;
 }
+
+// 热点产业分析类型
+export interface IndustryAnalysis {
+  id: string;
+  analysis_date: string; // YYYY-MM-DD
+  industry_name: string;
+  policy_analysis: string;
+  chain_analysis: string;
+  capacity_focus: string;
+  tech_development: string;
+  market_outlook: string | null;
+  related_symbols: RelatedSymbol[];
+  confidence: ConfidenceLevel;
+  source: string | null;
+  source_url: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IndustryAnalysisInsert {
+  id?: string;
+  analysis_date: string;
+  industry_name: string;
+  policy_analysis: string;
+  chain_analysis: string;
+  capacity_focus: string;
+  tech_development: string;
+  market_outlook?: string | null;
+  related_symbols?: RelatedSymbol[];
+  confidence?: ConfidenceLevel;
+  source?: string | null;
+  source_url?: string | null;
+  sort_order?: number;
+}
+
+export interface IndustryAnalysisUpdate {
+  industry_name?: string;
+  policy_analysis?: string;
+  chain_analysis?: string;
+  capacity_focus?: string;
+  tech_development?: string;
+  market_outlook?: string | null;
+  related_symbols?: RelatedSymbol[];
+  confidence?: ConfidenceLevel;
+  source?: string | null;
+  source_url?: string | null;
+  sort_order?: number;
+}

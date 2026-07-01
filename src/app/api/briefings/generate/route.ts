@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateBriefingForDate } from "@/lib/generate-briefing";
 import { createBriefing, deleteBriefingsByDate } from "@/storage/database/briefings";
+import { createIndustryAnalysisBatch, deleteIndustryAnalysisByDate } from "@/storage/database/industry-analysis";
 import { todayDateString } from "@/lib/date";
+import type { IndustryAnalysisInsert } from "@/types/briefing";
 
 export const dynamic = "force-dynamic";
 // Allow up to 3 minutes for the generation pipeline (web search + LLM)
@@ -16,6 +18,7 @@ export async function POST(request: NextRequest) {
 
     if (replace) {
       await deleteBriefingsByDate(date);
+      await deleteIndustryAnalysisByDate(date);
     }
     const created: unknown[] = [];
     for (const item of result.items) {
@@ -35,10 +38,32 @@ export async function POST(request: NextRequest) {
       });
       created.push(row);
     }
+
+    // 保存产业分析数据
+    let industryCount = 0;
+    if (result.industry_analysis && result.industry_analysis.length > 0) {
+      const industryItems = result.industry_analysis.map((ind) => ({
+        analysis_date: date,
+        industry_name: ind.industry_name,
+        policy_analysis: ind.policy_analysis,
+        chain_analysis: ind.chain_analysis,
+        capacity_focus: ind.capacity_focus,
+        tech_development: ind.tech_development,
+        market_outlook: ind.market_outlook,
+        related_symbols: ind.related_symbols,
+        confidence: ind.confidence,
+        source: ind.source,
+      }));
+      await createIndustryAnalysisBatch(industryItems as IndustryAnalysisInsert[]);
+      industryCount = industryItems.length;
+    }
+
     return NextResponse.json({
       success: true,
       date,
       count: created.length,
+      industry_count: industryCount,
+      industry_analysis: result.industry_analysis || [],
       modelVersion: result.modelVersion,
       searches: result.searches,
       usedSources: result.usedSources,

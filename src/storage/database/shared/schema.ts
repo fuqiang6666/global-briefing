@@ -101,6 +101,14 @@ export const emailSettings = pgTable("email_settings", {
 	includeModelLink: boolean("include_model_link").default(true).notNull(),
 	lastSentAt: timestamp("last_sent_at", { withTimezone: true, mode: 'string' }),
 	note: text(),
+	// SMTP 配置字段
+	smtpHost: varchar("smtp_host", { length: 100 }),
+	smtpPort: integer("smtp_port"),
+	smtpUser: varchar("smtp_user", { length: 100 }),
+	smtpPass: varchar("smtp_pass", { length: 100 }),
+	smtpSecure: boolean("smtp_secure").default(true),
+	smtpFromName: varchar("smtp_from_name", { length: 50 }),
+	smtpFromEmail: varchar("smtp_from_email", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -120,4 +128,25 @@ export const emailSendLog = pgTable("email_send_log", {
 }, (table) => [
 	index("email_send_log_date_idx").using("btree", table.sendDate.asc().nullsLast().op("date_ops")),
 	index("email_send_log_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
+]);
+
+// 热点产业分析表
+export const industryAnalysis = pgTable("industry_analysis", {
+	id: varchar({ length: 36 }).default(uuid()).primaryKey().notNull(),
+	analysisDate: date("analysis_date").notNull(),
+	industryName: varchar("industry_name", { length: 100 }).notNull(),
+	policyAnalysis: text("policy_analysis").notNull(),
+	chainAnalysis: text("chain_analysis").notNull(),
+	capacityFocus: text("capacity_focus").notNull(),
+	techDevelopment: text("tech_development").notNull(),
+	marketOutlook: text("market_outlook"),
+	relatedSymbols: jsonb("related_symbols").default([]).notNull(),
+	confidence: varchar({ length: 20 }).default('medium').notNull(),
+	source: varchar({ length: 200 }),
+	sourceUrl: varchar("source_url", { length: 500 }),
+	sortOrder: integer("sort_order").default(0).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("industry_analysis_date_idx").using("btree", table.analysisDate.asc().nullsLast().op("date_ops")),
 ]);

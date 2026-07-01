@@ -11,6 +11,11 @@ import {
   listBriefingsByDate,
 } from "@/storage/database/briefings";
 import {
+  createIndustryAnalysisBatch,
+  deleteIndustryAnalysisByDate,
+  listIndustryAnalysisByDate,
+} from "@/storage/database/industry-analysis";
+import {
   getEmailSettings,
   createEmailSendLog,
   updateEmailLastSent,
@@ -22,7 +27,7 @@ import {
   getBeijingDateString,
   getBeijingTimeString,
 } from "@/lib/date";
-import type { Briefing, EmailSettings } from "@/types/briefing";
+import type { Briefing, EmailSettings, IndustryAnalysis } from "@/types/briefing";
 import { SECTION_LABELS } from "@/types/briefing";
 
 export interface ScheduledRunResult {
@@ -31,6 +36,7 @@ export interface ScheduledRunResult {
   date: string;
   time: string;
   generatedCount?: number;
+  industryAnalysisCount?: number;
   emailStatus?: "sent" | "skipped" | "failed";
   emailError?: string | null;
   logId?: string | null;
@@ -89,6 +95,7 @@ export async function runScheduledTask(
 
   // Step 1: 生成简报
   let generatedCount = 0;
+  let industryAnalysisCount = 0;
   let modelVersion: number | null = null;
   if (!options.skipGenerate) {
     try {
@@ -112,6 +119,27 @@ export async function runScheduledTask(
       }
       generatedCount = result.items.length;
       modelVersion = result.modelVersion ?? null;
+      
+      // 保存产业分析
+      if (result.industry_analysis && result.industry_analysis.length > 0) {
+        await deleteIndustryAnalysisByDate(date);
+        const industryItems = result.industry_analysis.map((ind, idx) => ({
+          analysis_date: date,
+          industry_name: ind.industry_name,
+          policy_analysis: ind.policy_analysis,
+          chain_analysis: ind.chain_analysis,
+          capacity_focus: ind.capacity_focus,
+          tech_development: ind.tech_development,
+          market_outlook: ind.market_outlook,
+          related_symbols: ind.related_symbols,
+          confidence: ind.confidence,
+          source: ind.source,
+          source_url: ind.source_url,
+          sort_order: idx,
+        }));
+        await createIndustryAnalysisBatch(industryItems);
+        industryAnalysisCount = industryItems.length;
+      }
     } catch (genErr: unknown) {
       const errMsg = genErr instanceof Error ? genErr.message : String(genErr);
       return {
@@ -172,14 +200,17 @@ export async function runScheduledTask(
 
   const subject = `${settings.subject_prefix}（${date}）`;
   let items: Briefing[] = [];
+  let industryItems: IndustryAnalysis[] = [];
   try {
     items = await listBriefingsByDate(date);
+    industryItems = await listIndustryAnalysisByDate(date);
   } catch {
     items = [];
+    industryItems = [];
   }
   const domain = process.env.COZE_PROJECT_DOMAIN_DEFAULT || "";
-  const html = buildEmailHtml(date, items, settings, domain);
-  const text = buildEmailText(date, items);
+  const html = buildEmailHtml(date, items, settings, domain, industryItems);
+  const text = buildEmailText(date, items, industryItems);
 
   try {
     await sendEmail({
@@ -205,6 +236,7 @@ export async function runScheduledTask(
       date,
       time: timeStr,
       generatedCount,
+      industryAnalysisCount,
       emailStatus: "sent",
       logId: log.id,
     };
