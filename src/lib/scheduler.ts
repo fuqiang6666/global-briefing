@@ -264,7 +264,7 @@ export async function runScheduledTask(
   }
 }
 
-/** 判断当前是否应该触发（同一天 + 同分钟 + 未发过） */
+/** 判断当前是否应该触发（时间已过 + 今天未发过） */
 function shouldTriggerNow(
   settings: EmailSettings | null,
   now: Date,
@@ -281,12 +281,13 @@ function shouldTriggerNow(
       : [];
   if (recipients.length === 0)
     return { should: false, reason: "未配置收件人" };
+  
   const hour = getBeijingHour(now);
   const minute = getBeijingMinute(now);
-  if (settings.send_hour !== hour || settings.send_minute !== minute) {
-    return { should: false, reason: "未到发送时间" };
-  }
-  // 防重复：last_sent_at 是同一日期就跳过
+  const currentMinutes = hour * 60 + minute;
+  const targetMinutes = settings.send_hour * 60 + settings.send_minute;
+  
+  // 防重复：last_sent_at 是同一日期就跳过（优先检查）
   if (settings.last_sent_at) {
     const lastDate = getBeijingDateString(new Date(settings.last_sent_at));
     const today = getBeijingDateString(now);
@@ -294,6 +295,18 @@ function shouldTriggerNow(
       return { should: false, reason: "今日已发送过" };
     }
   }
+  
+  // 当前时间 >= 发送时间才触发（允许错过后的补发）
+  if (currentMinutes < targetMinutes) {
+    return { should: false, reason: "未到发送时间" };
+  }
+  
+  // 时间窗口：发送时间后最多2小时内可补发（防止深夜误触发）
+  const maxDelayMinutes = 120; // 2小时
+  if (currentMinutes > targetMinutes + maxDelayMinutes) {
+    return { should: false, reason: `已超过发送时间窗口（发送时间 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}，当前 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}）` };
+  }
+  
   return { should: true, reason: "ok" };
 }
 
