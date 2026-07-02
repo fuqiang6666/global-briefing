@@ -75,11 +75,19 @@ function getSupabaseCredentials(): SupabaseCredentials {
   const url = process.env.COZE_SUPABASE_URL;
   const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
 
-  if (!url) {
-    throw new Error('COZE_SUPABASE_URL is not set');
-  }
-  if (!anonKey) {
-    throw new Error('COZE_SUPABASE_ANON_KEY is not set');
+  // 构建时环境变量可能不存在，返回空值让后续处理
+  // 这避免了构建阶段的错误，实际运行时会正确注入环境变量
+  if (!url || !anonKey) {
+    // 检查是否是构建阶段（Next.js build）
+    const isBuildTime = process.env.NODE_ENV === 'production' && !process.env.COZE_PROJECT_ENV;
+    if (isBuildTime) {
+      // 返回 dummy 值，构建阶段不会实际使用
+      return { url: 'https://dummy.build.supabase.co', anonKey: 'dummy-build-key' };
+    }
+    
+    // 运行时缺失环境变量才是真正的错误
+    if (!url) throw new Error('COZE_SUPABASE_URL is not set');
+    if (!anonKey) throw new Error('COZE_SUPABASE_ANON_KEY is not set');
   }
 
   return { url, anonKey };
