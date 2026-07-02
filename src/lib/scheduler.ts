@@ -178,10 +178,9 @@ export async function runScheduledTask(
       ? [rawCc.trim()]
       : [];
   
-  // 时间窗口检查：当前时间 >= 发送时间且 <= 发送时间+2小时
+  // 时间窗口检查：当前时间 >= 发送时间（允许全天补发，只要今天没发送过）
   const currentMinutes = hour * 60 + minute;
   const targetMinutes = settings.send_hour * 60 + settings.send_minute;
-  const maxDelayMinutes = 120; // 2小时窗口
   
   // 检查是否今天已发送过（防重复）
   let alreadySentToday = false;
@@ -193,13 +192,11 @@ export async function runScheduledTask(
     }
   }
   
-  const isWithinTimeWindow = 
-    currentMinutes >= targetMinutes && 
-    currentMinutes <= targetMinutes + maxDelayMinutes;
+  const isAfterSendTime = currentMinutes >= targetMinutes;
   
   const shouldSend =
     options.forceSendEmail ||
-    (settings.enabled && recipients.length > 0 && isWithinTimeWindow && !alreadySentToday);
+    (settings.enabled && recipients.length > 0 && isAfterSendTime && !alreadySentToday);
 
   if (!shouldSend) {
     let reason: string;
@@ -209,10 +206,10 @@ export async function runScheduledTask(
       reason = "未配置收件人";
     } else if (alreadySentToday) {
       reason = "今日已发送过";
-    } else if (currentMinutes < targetMinutes) {
+    } else if (!isAfterSendTime) {
       reason = `未到发送时间（当前 ${timeStr}，计划 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}）`;
     } else {
-      reason = `已超过发送时间窗口（发送时间 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}，当前 ${timeStr}）`;
+      reason = "未知原因";
     }
     return {
       triggered: true,
@@ -322,15 +319,9 @@ function shouldTriggerNow(
     }
   }
   
-  // 当前时间 >= 发送时间才触发（允许错过后的补发）
+  // 当前时间 >= 发送时间才触发（允许全天补发）
   if (currentMinutes < targetMinutes) {
     return { should: false, reason: "未到发送时间" };
-  }
-  
-  // 时间窗口：发送时间后最多2小时内可补发（防止深夜误触发）
-  const maxDelayMinutes = 120; // 2小时
-  if (currentMinutes > targetMinutes + maxDelayMinutes) {
-    return { should: false, reason: `已超过发送时间窗口（发送时间 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}，当前 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}）` };
   }
   
   return { should: true, reason: "ok" };
