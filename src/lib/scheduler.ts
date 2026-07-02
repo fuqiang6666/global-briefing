@@ -177,20 +177,46 @@ export async function runScheduledTask(
     : typeof rawCc === "string" && rawCc.trim()
       ? [rawCc.trim()]
       : [];
-  const isTimeMatch =
-    settings.send_hour === hour && settings.send_minute === minute;
+  
+  // 时间窗口检查：当前时间 >= 发送时间且 <= 发送时间+2小时
+  const currentMinutes = hour * 60 + minute;
+  const targetMinutes = settings.send_hour * 60 + settings.send_minute;
+  const maxDelayMinutes = 120; // 2小时窗口
+  
+  // 检查是否今天已发送过（防重复）
+  let alreadySentToday = false;
+  if (settings.last_sent_at) {
+    const lastDate = getBeijingDateString(new Date(settings.last_sent_at));
+    const today = todayInBeijing();
+    if (lastDate === today) {
+      alreadySentToday = true;
+    }
+  }
+  
+  const isWithinTimeWindow = 
+    currentMinutes >= targetMinutes && 
+    currentMinutes <= targetMinutes + maxDelayMinutes;
+  
   const shouldSend =
     options.forceSendEmail ||
-    (settings.enabled && recipients.length > 0 && isTimeMatch);
+    (settings.enabled && recipients.length > 0 && isWithinTimeWindow && !alreadySentToday);
 
   if (!shouldSend) {
+    let reason: string;
+    if (!settings.enabled) {
+      reason = "邮件总开关未开启";
+    } else if (recipients.length === 0) {
+      reason = "未配置收件人";
+    } else if (alreadySentToday) {
+      reason = "今日已发送过";
+    } else if (currentMinutes < targetMinutes) {
+      reason = `未到发送时间（当前 ${timeStr}，计划 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}）`;
+    } else {
+      reason = `已超过发送时间窗口（发送时间 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}，当前 ${timeStr}）`;
+    }
     return {
       triggered: true,
-      reason: settings.enabled
-        ? recipients.length === 0
-          ? "未配置收件人"
-          : `未到发送时间（当前 ${timeStr}，计划 ${String(settings.send_hour).padStart(2, "0")}:${String(settings.send_minute).padStart(2, "0")}）`
-        : "邮件总开关未开启",
+      reason,
       date,
       time: timeStr,
       generatedCount,
