@@ -22,6 +22,13 @@ import {
   Loader2,
   X,
   Factory,
+  Download,
+  FileText,
+  Building2,
+  Target,
+  ShieldAlert,
+  Lightbulb,
+  BarChart3,
 } from "lucide-react";
 import {
   SECTION_LABELS,
@@ -34,6 +41,7 @@ import {
   type BriefingSection,
   type ConfidenceLevel,
   type IndustryAnalysis,
+  type KeyCompany,
 } from "@/types/briefing";
 
 const SECTION_ORDER: BriefingSection[] = [
@@ -376,7 +384,7 @@ export function HomePage() {
             })}
             {/* Industry Analysis Section */}
             {industryItems.length > 0 && (
-              <IndustrySection items={industryItems} />
+              <IndustrySection items={industryItems} date={date} />
             )}
           </div>
         )}
@@ -767,8 +775,31 @@ function formatInline(text: string): string {
 }
 
 // Industry Analysis Section Component
-function IndustrySection({ items }: { items: IndustryAnalysis[] }) {
+function IndustrySection({ items, date }: { items: IndustryAnalysis[]; date: string }) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const response = await fetch(`/api/industry-analysis/download?date=${date}`);
+      if (!response.ok) throw new Error("下载失败");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `产业分析报告_${date}.html`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("下载失败:", error);
+      alert("下载失败，请稍后重试");
+    } finally {
+      setDownloading(false);
+    }
+  };
   
   return (
     <section>
@@ -779,145 +810,249 @@ function IndustrySection({ items }: { items: IndustryAnalysis[] }) {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-slate-100 tracking-tight">
-              热点产业分析
+              热点产业深度分析
               <span className="ml-2 text-xs font-mono text-slate-500">
                 {items.length} 个产业
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              政策 · 产业链 · 产能 · 技术发展
+              政策 · 产业链 · 产能 · 技术 · 财报 · 竞争格局 · 投资建议
             </p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading || items.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {downloading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Download className="w-3.5 h-3.5" />
+          )}
+          下载报告
+        </button>
       </div>
       
       <div className="space-y-4">
         {items.map((ind, idx) => (
-          <div
-            key={ind.id || idx}
-            className="bg-[var(--panel)] border border-[var(--border)] rounded-md overflow-hidden"
-          >
-            {/* Header */}
-            <div className="px-4 py-3 border-b border-[var(--border)]">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs text-amber-400">
-                      #{String(idx + 1).padStart(2, "0")}
-                    </span>
-                    <span
-                      className={[
-                        "inline-block px-1.5 py-0.5 rounded text-xs font-semibold",
-                        CONFIDENCE_STYLES[ind.confidence || "medium"],
-                      ].join(" ")}
-                    >
-                      置信度 · {CONFIDENCE_LABELS[ind.confidence || "medium"]}
-                    </span>
-                  </div>
-                  <h3 className="text-base font-medium text-slate-100">
-                    {ind.industry_name}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpanded(expanded === idx ? null : idx)}
-                  className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400"
-                >
-                  {expanded === idx ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-              
-              {/* Related symbols */}
-              {ind.related_symbols && ind.related_symbols.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {ind.related_symbols.map((s, i) => (
-                    <span
-                      key={i}
-                      className={[
-                        "inline-block px-2 py-0.5 rounded text-xs font-mono",
-                        s.impact === "positive"
-                          ? "bg-emerald-500/15 text-emerald-400"
-                          : s.impact === "negative"
-                          ? "bg-rose-500/15 text-rose-400"
-                          : "bg-slate-500/15 text-slate-400",
-                      ].join(" ")}
-                    >
-                      {s.name}
-                      {s.impact === "positive" ? " ↑" : s.impact === "negative" ? " ↓" : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* Expanded content */}
-            {expanded === idx && (
-              <div className="px-4 py-3 space-y-3 text-sm">
-                <div>
-                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                    <span className="text-xs">▎</span>
-                    <span className="font-medium">政策分析</span>
-                  </div>
-                  <p className="text-slate-300 leading-relaxed">{ind.policy_analysis}</p>
-                </div>
-                
-                <div>
-                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                    <span className="text-xs">▎</span>
-                    <span className="font-medium">产业链分析</span>
-                  </div>
-                  <p className="text-slate-300 leading-relaxed">{ind.chain_analysis}</p>
-                </div>
-                
-                <div>
-                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                    <span className="text-xs">▎</span>
-                    <span className="font-medium">产能重点</span>
-                  </div>
-                  <p className="text-slate-300 leading-relaxed">{ind.capacity_focus}</p>
-                </div>
-                
-                <div>
-                  <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                    <span className="text-xs">▎</span>
-                    <span className="font-medium">技术发展</span>
-                  </div>
-                  <p className="text-slate-300 leading-relaxed">{ind.tech_development}</p>
-                </div>
-                
-                {ind.market_outlook && (
-                  <div>
-                    <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                      <span className="text-xs">▎</span>
-                      <span className="font-medium">市场展望</span>
-                    </div>
-                    <p className="text-slate-300 leading-relaxed">{ind.market_outlook}</p>
-                  </div>
-                )}
-                
-                {/* Footer */}
-                <div className="pt-2 border-t border-[var(--border)] text-xs text-slate-500">
-                  出处 · {ind.source || "—"}
-                  {ind.source_url && (
-                    <a
-                      href={ind.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-2 text-amber-400 hover:text-amber-300"
-                    >
-                      原文 →
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <IndustryCard 
+            key={ind.id || idx} 
+            industry={ind} 
+            index={idx}
+            expanded={expanded === idx}
+            onToggle={() => setExpanded(expanded === idx ? null : idx)}
+          />
         ))}
       </div>
     </section>
+  );
+}
+
+function IndustryCard({ 
+  industry: ind, 
+  index: idx,
+  expanded,
+  onToggle,
+}: { 
+  industry: IndustryAnalysis; 
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="bg-[var(--panel)] border border-[var(--border)] rounded-md overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs text-amber-400">
+                #{String(idx + 1).padStart(2, "0")}
+              </span>
+              <span
+                className={[
+                  "inline-block px-1.5 py-0.5 rounded text-xs font-semibold",
+                  CONFIDENCE_STYLES[ind.confidence || "medium"],
+                ].join(" ")}
+              >
+                置信度 · {CONFIDENCE_LABELS[ind.confidence || "medium"]}
+              </span>
+            </div>
+            <h3 className="text-base font-medium text-slate-100">
+              {ind.industry_name}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400"
+          >
+            {expanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+        
+        {/* Related symbols */}
+        {ind.related_symbols && ind.related_symbols.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {ind.related_symbols.map((s, i) => (
+              <span
+                key={i}
+                className={[
+                  "inline-block px-2 py-0.5 rounded text-xs font-mono",
+                  s.impact === "positive"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : s.impact === "negative"
+                    ? "bg-rose-500/15 text-rose-400"
+                    : "bg-slate-500/15 text-slate-400",
+                ].join(" ")}
+              >
+                {s.name}
+                {s.impact === "positive" ? " ↑" : s.impact === "negative" ? " ↓" : ""}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Expanded content */}
+      {expanded && (
+        <div className="px-4 py-3 space-y-4 text-sm">
+          {/* 基础分析模块 */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-amber-400 font-medium text-xs uppercase tracking-wider">
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>基础分析</span>
+            </div>
+            
+            <AnalysisModule title="政策分析" icon="📋" content={ind.policy_analysis} />
+            <AnalysisModule title="产业链分析" icon="🔗" content={ind.chain_analysis} />
+            <AnalysisModule title="产能重点" icon="🏭" content={ind.capacity_focus} />
+            <AnalysisModule title="技术发展" icon="💡" content={ind.tech_development} />
+          </div>
+          
+          {/* 深度分析模块 */}
+          {(ind.financial_report_analysis || ind.competitive_landscape || ind.investment_suggestion || ind.key_companies) && (
+            <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+              <div className="flex items-center gap-2 text-emerald-400 font-medium text-xs uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5" />
+                <span>深度分析</span>
+              </div>
+              
+              {ind.financial_report_analysis && (
+                <AnalysisModule title="龙头企业财报" icon="📊" content={ind.financial_report_analysis} highlight />
+              )}
+              
+              {ind.competitive_landscape && (
+                <AnalysisModule title="竞争格局" icon="🎯" content={ind.competitive_landscape} />
+              )}
+              
+              {ind.key_companies && ind.key_companies.length > 0 && (
+                <KeyCompaniesTable companies={ind.key_companies} />
+              )}
+            </div>
+          )}
+          
+          {/* 投资建议与风险提示 */}
+          {(ind.investment_suggestion || ind.risk_warning) && (
+            <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+              {ind.investment_suggestion && (
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded p-3">
+                  <div className="flex items-center gap-1.5 text-emerald-400 mb-1">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    <span className="font-medium text-xs">投资建议</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed text-xs">{ind.investment_suggestion}</p>
+                </div>
+              )}
+              
+              {ind.risk_warning && (
+                <div className="bg-rose-500/5 border border-rose-500/20 rounded p-3">
+                  <div className="flex items-center gap-1.5 text-rose-400 mb-1">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span className="font-medium text-xs">风险提示</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed text-xs">{ind.risk_warning}</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* 市场展望 */}
+          {ind.market_outlook && (
+            <div className="pt-3 border-t border-[var(--border)]">
+              <AnalysisModule title="市场展望" icon="🔮" content={ind.market_outlook} />
+            </div>
+          )}
+          
+          {/* Footer */}
+          <div className="pt-2 border-t border-[var(--border)] text-xs text-slate-500">
+            出处 · {ind.source || "—"}
+            {ind.source_url && (
+              <a
+                href={ind.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 text-amber-400 hover:text-amber-300"
+              >
+                原文 →
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnalysisModule({ title, icon, content, highlight }: { title: string; icon: string; content: string; highlight?: boolean }) {
+  return (
+    <div className={highlight ? "bg-amber-500/5 border border-amber-500/10 rounded p-3" : ""}>
+      <div className="flex items-center gap-1.5 text-amber-400 mb-1">
+        <span className="text-xs">{icon}</span>
+        <span className="font-medium text-xs">{title}</span>
+      </div>
+      <p className="text-slate-300 leading-relaxed text-xs">{content}</p>
+    </div>
+  );
+}
+
+function KeyCompaniesTable({ companies }: { companies: KeyCompany[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-amber-400 mb-2">
+        <Building2 className="w-3.5 h-3.5" />
+        <span className="font-medium text-xs">关键企业</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-[var(--border)]">
+              <th className="text-left py-1.5 px-2 text-slate-400 font-medium">公司</th>
+              <th className="text-left py-1.5 px-2 text-slate-400 font-medium">代码</th>
+              <th className="text-left py-1.5 px-2 text-slate-400 font-medium">市值</th>
+              <th className="text-left py-1.5 px-2 text-slate-400 font-medium">营收增速</th>
+              <th className="text-left py-1.5 px-2 text-slate-400 font-medium">行业地位</th>
+            </tr>
+          </thead>
+          <tbody>
+            {companies.map((company, i) => (
+              <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-slate-800/30">
+                <td className="py-1.5 px-2 text-slate-200 font-medium">{company.name}</td>
+                <td className="py-1.5 px-2 font-mono text-slate-400">{company.code}</td>
+                <td className="py-1.5 px-2 font-mono text-slate-300">{company.market_cap}</td>
+                <td className="py-1.5 px-2 font-mono text-emerald-400">{company.revenue_growth}</td>
+                <td className="py-1.5 px-2 text-slate-300">{company.position}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

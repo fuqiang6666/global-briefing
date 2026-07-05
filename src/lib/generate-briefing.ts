@@ -27,6 +27,19 @@ export interface GeneratedIndustryAnalysis {
   capacity_focus: string;
   tech_development: string;
   market_outlook: string | null;
+  // 新增深度分析字段
+  financial_report_analysis: string | null;
+  competitive_landscape: string | null;
+  investment_suggestion: string | null;
+  risk_warning: string | null;
+  key_companies: Array<{
+    name: string;
+    code: string;
+    market_cap: string;
+    revenue_growth: string;
+    key_metric: string;
+    position: string;
+  }> | null;
   related_symbols: RelatedSymbol[];
   confidence: ConfidenceLevel;
   source: string | null;
@@ -342,16 +355,19 @@ function buildIndustryQueries(
   const highT = topics.filter((t) => t.weight >= 7).slice(0, 2).map((t) => t.topic);
   
   for (const k of highK) {
-    queries.push(`${k} 产业链分析 最新政策`);
-    queries.push(`${k} 技术发展 产能布局`);
+    queries.push(`${k} 产业链深度分析 龙头企业财报`);
+    queries.push(`${k} 竞争格局 产能布局 技术发展`);
+    queries.push(`${k} 行业研报 投资建议 风险提示`);
   }
   for (const t of highT) {
-    queries.push(`${t} 产业政策 投资机会`);
+    queries.push(`${t} 产业政策 龙头企业 财报分析`);
+    queries.push(`${t} 市场规模 竞争格局 投资机会`);
   }
   
   // 通用的热点产业搜索
-  queries.push("热门赛道 产业链深度分析");
-  queries.push("新能源 人工智能 产业政策");
+  queries.push("热门赛道 产业链深度分析 龙头企业");
+  queries.push("新能源 人工智能 半导体 行业研报");
+  queries.push("上市公司财报 营收增长 市场份额");
   
   return queries;
 }
@@ -376,18 +392,28 @@ function buildIndustryAnalysisPrompt(input: IndustryPromptInput): string {
 
   return `日期：${input.date}
 
-任务：基于候选新闻，生成 1-2 个热点产业的深度分析报告。
+任务：基于候选新闻和行业研报，生成 1-2 个热点产业的深度分析报告。要求像专业券商研报一样深入、结构化。
 
-每个产业分析包含以下内容：
+每个产业分析包含以下模块化内容：
+
+【基础分析模块】
 1. industry_name: 产业名称（如"新能源汽车"、"人工智能"、"半导体"等）
-2. policy_analysis: 政策分析（当前相关政策、法规、补贴等，约100-150字）
-3. chain_analysis: 产业链分析（上游原材料、中游制造、下游应用，约150字）
-4. capacity_focus: 产能重点（当前产能分布、龙头企业产能、产能缺口，约100字）
-5. tech_development: 技术发展（最新技术突破、技术路线、技术瓶颈，约100字）
-6. market_outlook: 市场展望（未来趋势、投资机会、风险提示，约80字，可选）
-7. related_symbols: 相关标的数组，格式 {"type":"stock/future/option","name":"...","code":"...","impact":"positive/negative/neutral"}
-8. confidence: high/medium/low
-9. source: 来源媒体名（从 ${sourceList} 中选）
+2. policy_analysis: 政策分析（当前相关政策、法规、补贴、监管动态，约150字）
+3. chain_analysis: 产业链分析（上游原材料、中游制造、下游应用、各环节利润率，约200字）
+4. capacity_focus: 产能重点（当前产能分布、龙头企业产能规划、产能利用率、供需缺口，约150字）
+5. tech_development: 技术发展（最新技术突破、技术路线对比、技术壁垒、研发进展，约150字）
+
+【深度分析模块】
+6. financial_report_analysis: 龙头企业财报分析（引用具体上市公司财报数据，如营收、净利润、毛利率、同比增速等，约200字）
+7. competitive_landscape: 竞争格局（市场份额分布、CR3/CR5、竞争态势、护城河分析，约150字）
+8. investment_suggestion: 投资建议（当前估值水平、配置建议、催化剂、目标价区间，约100字）
+9. risk_warning: 风险提示（政策风险、技术风险、市场风险、竞争风险等，约80字）
+10. key_companies: 关键企业列表（3-5家龙头企业），格式：
+   [{"name":"公司名","code":"股票代码","market_cap":"市值","revenue_growth":"营收增速","key_metric":"关键指标","position":"行业地位"}]
+11. market_outlook: 市场展望（未来3-5年趋势、市场规模预测、投资机会，约100字，可选）
+12. related_symbols: 相关标的数组，格式 {"type":"stock/future/option","name":"...","code":"...","impact":"positive/negative/neutral"}
+13. confidence: high/medium/low
+14. source: 来源媒体名（从 ${sourceList} 中选）
 
 输出严格 JSON，格式：
 {
@@ -398,6 +424,11 @@ function buildIndustryAnalysisPrompt(input: IndustryPromptInput): string {
       "chain_analysis": "...",
       "capacity_focus": "...",
       "tech_development": "...",
+      "financial_report_analysis": "...",
+      "competitive_landscape": "...",
+      "investment_suggestion": "...",
+      "risk_warning": "...",
+      "key_companies": [...],
       "market_outlook": "...",
       "related_symbols": [...],
       "confidence": "high|medium|low",
@@ -437,10 +468,16 @@ function parseGeneratedIndustryAnalysis(
     if (!it.related_symbols || !Array.isArray(it.related_symbols)) {
       it.related_symbols = [];
     }
-    // 确保字段不为空
+    // 确保基础字段不为空
     if (!it.chain_analysis) it.chain_analysis = "暂无产业链分析";
     if (!it.capacity_focus) it.capacity_focus = "暂无产能重点信息";
     if (!it.tech_development) it.tech_development = "暂无技术发展信息";
+    // 新增深度分析字段的默认值
+    if (!it.financial_report_analysis) it.financial_report_analysis = null;
+    if (!it.competitive_landscape) it.competitive_landscape = null;
+    if (!it.investment_suggestion) it.investment_suggestion = null;
+    if (!it.risk_warning) it.risk_warning = null;
+    if (!it.key_companies || !Array.isArray(it.key_companies)) it.key_companies = null;
     if (!it.market_outlook) it.market_outlook = null;
   }
   

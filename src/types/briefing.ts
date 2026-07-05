@@ -237,6 +237,12 @@ export interface IndustryAnalysis {
   capacity_focus: string;
   tech_development: string;
   market_outlook: string | null;
+  // 新增深度分析字段
+  financial_report_analysis: string | null; // 龙头企业财报分析
+  competitive_landscape: string | null; // 竞争格局分析
+  investment_suggestion: string | null; // 投资建议
+  risk_warning: string | null; // 风险提示
+  key_companies: KeyCompany[] | null; // 关键企业列表
   related_symbols: RelatedSymbol[];
   confidence: ConfidenceLevel;
   source: string | null;
@@ -244,6 +250,15 @@ export interface IndustryAnalysis {
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface KeyCompany {
+  name: string;
+  code: string;
+  market_cap: string; // 市值
+  revenue_growth: string; // 营收增长
+  key_metric: string; // 关键指标
+  position: string; // 行业地位
 }
 
 export interface IndustryAnalysisInsert {
@@ -255,6 +270,11 @@ export interface IndustryAnalysisInsert {
   capacity_focus: string;
   tech_development: string;
   market_outlook?: string | null;
+  financial_report_analysis?: string | null;
+  competitive_landscape?: string | null;
+  investment_suggestion?: string | null;
+  risk_warning?: string | null;
+  key_companies?: KeyCompany[] | null;
   related_symbols?: RelatedSymbol[];
   confidence?: ConfidenceLevel;
   source?: string | null;
@@ -269,6 +289,11 @@ export interface IndustryAnalysisUpdate {
   capacity_focus?: string;
   tech_development?: string;
   market_outlook?: string | null;
+  financial_report_analysis?: string | null;
+  competitive_landscape?: string | null;
+  investment_suggestion?: string | null;
+  risk_warning?: string | null;
+  key_companies?: KeyCompany[] | null;
   related_symbols?: RelatedSymbol[];
   confidence?: ConfidenceLevel;
   source?: string | null;

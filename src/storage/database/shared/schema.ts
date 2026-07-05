@@ -139,6 +139,12 @@ export const industryAnalysis = pgTable("industry_analysis", {
 	capacityFocus: text("capacity_focus").notNull(),
 	techDevelopment: text("tech_development").notNull(),
 	marketOutlook: text("market_outlook"),
+	// 新增深度分析字段
+	financialReportAnalysis: text("financial_report_analysis"),
+	competitiveLandscape: text("competitive_landscape"),
+	investmentSuggestion: text("investment_suggestion"),
+	riskWarning: text("risk_warning"),
+	keyCompanies: jsonb("key_companies"),
 	relatedSymbols: jsonb("related_symbols").default([]).notNull(),
 	confidence: varchar({ length: 20 }).default('medium').notNull(),
 	source: varchar({ length: 200 }),
