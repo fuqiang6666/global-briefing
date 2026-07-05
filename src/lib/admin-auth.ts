@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const COOKIE_NAME = "gb_admin";
 const SESSION_MAX_AGE = 60 * 60 * 8; // 8 小时
-const DEFAULT_PASSWORD = "fu57124";
+const DEFAULT_PASSWORD = "fu51898";
 
 function getSecret(): string {
   return process.env.ADMIN_SESSION_SECRET ?? "global-briefing-admin-secret";
