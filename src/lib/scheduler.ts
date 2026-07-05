@@ -136,6 +136,12 @@ export async function runScheduledTask(
           source: ind.source,
           source_url: ind.source_url,
           sort_order: idx,
+          // 新增深度分析字段
+          financial_report_analysis: ind.financial_report_analysis ?? null,
+          competitive_landscape: ind.competitive_landscape ?? null,
+          key_companies: ind.key_companies ?? null,
+          investment_suggestion: ind.investment_suggestion ?? null,
+          risk_warning: ind.risk_warning ?? null,
         }));
         await createIndustryAnalysisBatch(industryItems);
         industryAnalysisCount = industryItems.length;
