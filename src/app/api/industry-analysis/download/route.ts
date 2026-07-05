@@ -51,13 +51,13 @@ function generateReportHtml(date: string, items: IndustryAnalysis[]): string {
     
     let deepAnalysisHtml = "";
     if (ind.financial_report_analysis || ind.competitive_landscape || (ind.key_companies && ind.key_companies.length > 0)) {
-      let financialHtml = ind.financial_report_analysis ? `
+      const financialHtml = ind.financial_report_analysis ? `
         <div class="module highlight-module">
           <div class="module-title">📊 龙头企业财报</div>
           <div class="module-content">${ind.financial_report_analysis}</div>
         </div>` : "";
       
-      let competitiveHtml = ind.competitive_landscape ? `
+      const competitiveHtml = ind.competitive_landscape ? `
         <div class="module">
           <div class="module-title">🎯 竞争格局</div>
           <div class="module-content">${ind.competitive_landscape}</div>

@@ -233,7 +233,7 @@ export async function runScheduledTask(
   }
   const domain = process.env.COZE_PROJECT_DOMAIN_DEFAULT || "";
   const html = buildEmailHtml(date, items, settings, domain, industryItems);
-  const text = buildEmailText(date, items, industryItems);
+  const text = buildEmailText(date, items, industryItems, domain);
 
   try {
     await sendEmail({

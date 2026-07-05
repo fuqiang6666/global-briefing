@@ -43,7 +43,7 @@ function groupBySection(items: Briefing[]): Array<{
 }
 
 // 产业分析 HTML 模板
-function buildIndustryAnalysisHtml(items: IndustryAnalysis[]): string {
+function buildIndustryAnalysisHtml(items: IndustryAnalysis[], domain: string, date: string): string {
   if (!items || items.length === 0) return "";
   
   return items.map((ind, idx) => {
@@ -55,6 +55,38 @@ function buildIndustryAnalysisHtml(items: IndustryAnalysis[]): string {
     
     const relatedSymbols = ind.related_symbols?.length > 0
       ? ind.related_symbols.map(s => `${s.name}(${s.impact === "positive" ? "+" : s.impact === "negative" ? "-" : "~"})`).join(" ")
+      : "";
+    
+    // 关键企业表格
+    const keyCompaniesHtml = ind.key_companies && ind.key_companies.length > 0
+      ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:8px;">▎关键企业</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="border-bottom:1px solid #1E2638;">
+                <th style="padding:6px 8px;text-align:left;color:#7B8499;font-weight:500;">公司</th>
+                <th style="padding:6px 8px;text-align:left;color:#7B8499;font-weight:500;">代码</th>
+                <th style="padding:6px 8px;text-align:right;color:#7B8499;font-weight:500;">营收增速</th>
+                <th style="padding:6px 8px;text-align:left;color:#7B8499;font-weight:500;">行业地位</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ind.key_companies.map(c => {
+                const growthNum = parseFloat(c.revenue_growth || "0");
+                const growthColor = growthNum >= 0 ? "#3DA37A" : "#D45C5C";
+                const growthText = c.revenue_growth ? `${growthNum > 0 ? "+" : ""}${c.revenue_growth}%` : "—";
+                return `
+                <tr style="border-bottom:1px solid rgba(30,38,56,0.5);">
+                  <td style="padding:6px 8px;color:#E8EAF0;">${escapeHtml(c.name)}</td>
+                  <td style="padding:6px 8px;color:#A6ADC0;font-family:'JetBrains Mono',monospace;">${escapeHtml(c.code || "—")}</td>
+                  <td style="padding:6px 8px;text-align:right;color:${growthColor};font-family:'JetBrains Mono',monospace;">${growthText}</td>
+                  <td style="padding:6px 8px;color:#A6ADC0;">${escapeHtml(c.position || "—")}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>`
       : "";
     
     return `
@@ -88,6 +120,32 @@ function buildIndustryAnalysisHtml(items: IndustryAnalysis[]): string {
                   <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎技术发展</div>
                   <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.tech_development)}</div>
                 </div>
+                
+                ${ind.financial_report_analysis ? `
+                <div style="margin-bottom:12px;padding:12px;background:rgba(212,162,76,0.05);border-left:3px solid #D4A24C;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎龙头企业财报分析</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.financial_report_analysis)}</div>
+                </div>` : ""}
+                
+                ${ind.competitive_landscape ? `
+                <div style="margin-bottom:12px;">
+                  <div style="font-size:13px;color:#D4A24C;font-weight:600;margin-bottom:4px;">▎竞争格局</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.competitive_landscape)}</div>
+                </div>` : ""}
+                
+                ${keyCompaniesHtml}
+                
+                ${ind.investment_suggestion ? `
+                <div style="margin-bottom:12px;padding:12px;background:rgba(61,163,122,0.08);border-left:3px solid #3DA37A;">
+                  <div style="font-size:13px;color:#3DA37A;font-weight:600;margin-bottom:4px;">▎投资建议</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.investment_suggestion)}</div>
+                </div>` : ""}
+                
+                ${ind.risk_warning ? `
+                <div style="margin-bottom:12px;padding:12px;background:rgba(212,92,92,0.08);border-left:3px solid #D45C5C;">
+                  <div style="font-size:13px;color:#D45C5C;font-weight:600;margin-bottom:4px;">▎风险提示</div>
+                  <div style="font-size:14px;color:#A6ADC0;line-height:1.6;">${escapeHtml(ind.risk_warning)}</div>
+                </div>` : ""}
                 
                 ${ind.market_outlook ? `
                 <div style="margin-bottom:12px;">
@@ -214,7 +272,13 @@ export function buildEmailHtml(
               </div>
             </td>
           </tr>
-          ${buildIndustryAnalysisHtml(industryItems)}`
+          ${buildIndustryAnalysisHtml(industryItems, domain, date)}
+          ${domain ? `
+          <tr>
+            <td style="padding:12px 0;text-align:center;">
+              <a href="${domain.replace(/\/$/, "")}/api/industry-analysis/download?date=${date}" style="display:inline-block;padding:10px 24px;background:#D4A24C;color:#0A0E1A;font-size:13px;font-weight:600;text-decoration:none;border-radius:4px;">下载完整产业分析报告</a>
+            </td>
+          </tr>` : ""}`
             : ""}
           ${footerLinks.length > 0
             ? `<tr><td style="padding:24px 0 8px;border-top:1px solid #1E2638;font-size:12px;color:#7B8499;">${footerLinks.join("")}</td></tr>`
@@ -232,7 +296,7 @@ export function buildEmailHtml(
 </html>`;
 }
 
-export function buildEmailText(date: string, items: Briefing[], industryItems: IndustryAnalysis[] = []): string {
+export function buildEmailText(date: string, items: Briefing[], industryItems: IndustryAnalysis[] = [], domain: string = ""): string {
   const groups = groupBySection(items);
   const lines: string[] = [];
   lines.push(`每日全球要闻简报 · ${date}`);
@@ -266,6 +330,25 @@ export function buildEmailText(date: string, items: Briefing[], industryItems: I
       lines.push(`   产业链分析：${ind.chain_analysis}`);
       lines.push(`   产能重点：${ind.capacity_focus}`);
       lines.push(`   技术发展：${ind.tech_development}`);
+      if (ind.financial_report_analysis) {
+        lines.push(`   【龙头企业财报分析】${ind.financial_report_analysis}`);
+      }
+      if (ind.competitive_landscape) {
+        lines.push(`   【竞争格局】${ind.competitive_landscape}`);
+      }
+      if (ind.key_companies && ind.key_companies.length > 0) {
+        lines.push(`   【关键企业】`);
+        ind.key_companies.forEach(c => {
+          const growth = c.revenue_growth || "—";
+          lines.push(`     - ${c.name}(${c.code || "无代码"}) 营收增速:${growth} ${c.position || ""}`);
+        });
+      }
+      if (ind.investment_suggestion) {
+        lines.push(`   【投资建议】${ind.investment_suggestion}`);
+      }
+      if (ind.risk_warning) {
+        lines.push(`   【风险提示】${ind.risk_warning}`);
+      }
       if (ind.market_outlook) lines.push(`   市场展望：${ind.market_outlook}`);
       if (ind.related_symbols?.length > 0) {
         const symbols = ind.related_symbols.map(s => `${s.name}(${s.impact === "positive" ? "+" : s.impact === "negative" ? "-" : "~"})`).join(" ");
@@ -274,6 +357,10 @@ export function buildEmailText(date: string, items: Briefing[], industryItems: I
       lines.push(`   置信度：${CONFIDENCE_LABELS[ind.confidence] ?? ind.confidence}`);
       lines.push("");
     });
+    lines.push("   完整报告请下载附件或访问：");
+    if (domain) {
+      lines.push(`   ${domain.replace(/\/$/, "")}/api/industry-analysis/download?date=${date}`);
+    }
   }
   return lines.join("\n");
 }
