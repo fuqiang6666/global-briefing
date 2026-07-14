@@ -5,44 +5,31 @@ on:
     # UTC 00:01 = 北京时间 08:01 (UTC+8)
     - cron: '1 0 * * *'
   workflow_dispatch:
-    # 允许手动触发测试
 
 jobs:
   send-briefing:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    
     steps:
-      - name: Trigger daily briefing cron API
+      # 生成简报内容（后续替换成你的资讯抓取逻辑，先测试用固定文本）
+      - name: Generate brief content
         run: |
-          echo "Triggering daily briefing at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          
-          RESPONSE=$(curl -s -X POST \
-            -H 'Content-Type: application/json' \
-            -d '{"secret":"global-briefing-default-secret"}' \
-            -w "\nHTTP_STATUS:%{http_code}" \
-            https://df675843-a9b6-4c68-ad0f-75f574b88fc8.dev.coze.site/api/cron/daily)
-          
-          HTTP_BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
-          HTTP_STATUS=$(echo "$RESPONSE" | grep 'HTTP_STATUS:' | cut -d: -f2)
-          
-          echo "HTTP Status: $HTTP_STATUS"
-          echo "Response: $HTTP_BODY"
-          
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::API request failed with status $HTTP_STATUS"
-            exit 1
-          fi
-          
-          # 检查响应中的 emailStatus
-          EMAIL_STATUS=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('emailStatus','-'))" 2>/dev/null || echo "-")
-          
-          if [ "$EMAIL_STATUS" = "failed" ]; then
-            echo "::warning::Email send failed, check the response for details"
-          else
-            echo "Email status: $EMAIL_STATUS"
-          fi
-      
+          echo "今日全球简报测试内容" > brief.txt
+
+      # 内置发邮件动作
+      - name: Send Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.qq.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: 每日早间简报
+          to: 24021905@qq.com
+          from: ${{ secrets.EMAIL_USER }}
+          body: file://brief.txt
+
+      # 底部汇总信息（保留原展示逻辑）
       - name: Summary
         if: always()
         run: |
